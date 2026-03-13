@@ -109,6 +109,7 @@ function doPost(e) {
 
     // WEB AUTH BIOMETRIC LOGIN (Usernameless)
     if (data.action === "login_bio") {
+      if (getSetting(settingsSheet, "BIOMETRICS_ENABLED") === "false") return ContentService.createTextOutput("403");
       const rows = userSheet.getDataRange().getValues();
       const isMaint = getSetting(settingsSheet, "MAINTENANCE") === "true";
       for (let i = 1; i < rows.length; i++) {
@@ -122,9 +123,9 @@ function doPost(e) {
           
           if (sessionSheet.getLastRow() > 1) {
             const sessions = sessionSheet.getDataRange().getValues();
-            for(let s = sessions.length - 1; s >= 1; s--) {
-              if(String(sessions[s][1]).trim() === matchedUsername) sessionSheet.deleteRow(s + 1);
-            }
+            const keepSessions = sessions.filter((r, i) => i === 0 || String(r[1]).trim() !== matchedUsername);
+            sessionSheet.clearContents();
+            if (keepSessions.length > 0) sessionSheet.getRange(1, 1, keepSessions.length, sessions[0].length).setValues(keepSessions);
           }
           
           const sessionToken = Utilities.getUuid();
@@ -227,6 +228,12 @@ function doPost(e) {
         }
       }
       logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Turned Maintenance Mode ON" : "Turned Maintenance Mode OFF"]);
+      return ContentService.createTextOutput("200");
+    }
+
+    if (data.action === "toggle_biometrics") {
+      updateSetting(settingsSheet, "BIOMETRICS_ENABLED", data.state === true ? "true" : "false");
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Enabled Biometric Login" : "Disabled Biometric Login"]);
       return ContentService.createTextOutput("200");
     }
 
@@ -408,7 +415,7 @@ function doGet(e) {
         const uData = userSheet.getDataRange().getValues().slice(1);
         devs = uData.filter(r => String(r[3]).toLowerCase().includes('developer')).map(r => String(r[1]).toLowerCase());
       }
-      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, devs: devs, isSetup: isSetup })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, devs: devs, isSetup: isSetup, bioEnabled: settingsSheet ? getSetting(settingsSheet, "BIOMETRICS_ENABLED") !== "false" : true })).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (!userSheet) return ContentService.createTextOutput("ERROR: 'Users' sheet missing.");
@@ -441,9 +448,10 @@ function doGet(e) {
       
     let activeUsers = users.filter(u => u.status === 'Online');
     const keyCount = secSheet ? Math.max(0, secSheet.getLastRow() - 1) : 0;
+    const bioEnabled = settingsSheet ? getSetting(settingsSheet, "BIOMETRICS_ENABLED") !== "false" : true;
     
     return ContentService.createTextOutput(JSON.stringify({
-      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, keyCount: keyCount
+      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, keyCount: keyCount, bioEnabled: bioEnabled
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch(err) {
