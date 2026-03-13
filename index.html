@@ -61,11 +61,11 @@
         .btn-red:hover { background: var(--red); color: white; border-color: var(--red); box-shadow: 0 0 10px rgba(255,42,85,0.5); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
         .btn-gold:hover { background: var(--gold); color: black; border-color: var(--gold); }
+        .btn-green { border-color: var(--green); color: var(--green); }
+        .btn-green:hover { background: var(--green); color: black; border-color: var(--green); box-shadow: 0 0 10px rgba(0,230,118,0.5); }
         
         .btn-maint-off { background: transparent; border: 1px solid var(--grey); color: #888; }
         .btn-maint-on { background: rgba(255,42,85,0.1); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 15px rgba(255,42,85,0.2); }
-        .btn-bio-on { background: rgba(0,230,118,0.1); border: 1px solid var(--green); color: var(--green); box-shadow: 0 0 15px rgba(0,230,118,0.1); }
-        .btn-bio-off { background: transparent; border: 1px solid var(--grey); color: #888; }
 
         .table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
         .data-table { width: 100%; min-width: 650px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
@@ -184,7 +184,6 @@
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <button onclick="refreshDB()" class="btn-small" style="color:var(--blue); border-color:var(--blue); margin-right:15px;">🔄 Refresh Data</button>
                     <button id="maint-btn" onclick="toggleMaintenance()" style="display:none; width:130px; font-size:10px;" class="btn-maint-off">Maintenance: OFF</button>
-                    <button id="bio-toggle-btn" onclick="toggleBiometrics()" style="display:none; width:130px; font-size:10px;" class="btn-bio-on">Biometrics: ON</button>
                     <button id="logs-btn" onclick="openLogsModal()" style="display:none; width:100px; font-size:10px; background: rgba(0,115,230,0.1); border: 1px solid var(--blue); color: var(--blue);">System Logs</button>
                 </div>
             </div>
@@ -211,12 +210,12 @@
                         <thead>
                             <tr>
                                 <th style="width: 5%;"><input type="checkbox" id="selectAll" onclick="toggleAllUsers(this)"></th>
-                                <th style="width: 15%;">ID</th>
-                                <th style="width: 25%;">Username</th>
-                                <th style="width: 15%;">Role</th>
-                                <th style="width: 15%;">Status</th>
+                                <th style="width: 12%;">ID</th>
+                                <th style="width: 22%;">Username</th>
+                                <th style="width: 12%;">Role</th>
+                                <th style="width: 14%;">Status</th>
                                 <th style="width: 15%;">Session</th>
-                                <th style="width: 10%; text-align: right;">Action</th>
+                                <th style="width: 20%; text-align: right;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="user-body"></tbody>
@@ -377,7 +376,7 @@
     let liveRadarTimer = null; 
     let phantomKillerTimer = null; 
     let masterData = null;
-    let sysData = { maintenance: false, devs: [], isSetup: false, bioEnabled: true };
+    let sysData = { maintenance: false, devs: [], isSetup: false };
     
     let loginFailAttempts = 0;
     let loginLockoutTimer = null;
@@ -462,8 +461,6 @@
             }
             sysData.maintenance = d.maintenance;
             sysData.devs = d.devs || [];
-            sysData.bioEnabled = d.bioEnabled !== false;
-            document.getElementById('bio-btn').style.display = sysData.bioEnabled ? '' : 'none';
             checkMaintenancePreflight();
         }).catch(e=>{});
 
@@ -564,7 +561,8 @@
                 sessionStorage.setItem('mgc_token', data.token); 
                 sessionStorage.setItem('mgc_links_sec', sysCrypt.lock(data.links || []));
                 
-                if (!data.bioEnabled && window.PublicKeyCredential) {
+                // Prompt for Biometrics only if they don't have it AND it's not disabled for their account
+                if (!data.bioEnabled && data.bioStatus !== "Disabled" && window.PublicKeyCredential) {
                     tempBioUsername = u;
                     document.getElementById('bio-setup-modal').style.display = 'flex';
                 } else {
@@ -575,7 +573,7 @@
         } catch(e) { clearInterval(loadingInterval); setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = "Network Offline."; }
     }
 
-    // BIOMETRIC ENROLLMENT & LOGIN
+    // BIOMETRIC ENROLLMENT & LOGIN (SPEED OPTIMIZED)
     async function enrollBiometrics() {
         try {
             const pubKey = {
@@ -607,19 +605,22 @@
 
     async function loginBiometric() {
         try {
-            setUIState('bio-btn', true, "Awaiting Biometrics...");
-            const pubKey = {
-                challenge: crypto.getRandomValues(new Uint8Array(32)),
-                rpId: document.location.hostname,
-                userVerification: "required"
-            };
+            // Speed Optimize: Trigger OS prompt immediately before server contact
+            const pubKey = { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: document.location.hostname, userVerification: "required" };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
+            
+            // UI visual feedback post-scan
+            setUIState('bio-btn', true, "Authenticating...");
             
             const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId }));
             const text = await res.text();
             
-            if (text === "401" || text.startsWith("ERROR:")) { 
+            if (text === "403_BIO") {
+                setUIState('bio-btn', false, "🧬 Face / Fingerprint Login"); 
+                document.getElementById('login-status').innerText = "Biometrics Disabled.";
+                alert("SECURITY ALERT:\n\nBiometric login has been disabled for your account by the Administrator. Please use your standard password.");
+            } else if (text === "401" || text.startsWith("ERROR:")) { 
                 setUIState('bio-btn', false, "🧬 Face / Fingerprint Login"); document.getElementById('login-status').innerText = "Biometric Verification Failed."; 
             } else if (text === "503") {
                 document.getElementById('login-container').style.display = "none";
@@ -637,6 +638,13 @@
             setUIState('bio-btn', false, "🧬 Face / Fingerprint Login");
             document.getElementById('login-status').innerText = "Biometrics canceled or unavailable.";
         }
+    }
+
+    // ADMIN: TOGGLE BIO ACCESS
+    async function toggleBioAccess(targetUser) {
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        await fetch(API, postConfig({ action: "toggle_bio", targetUser: targetUser, operatorId: session.id, operatorName: session.name }));
+        refreshDB();
     }
 
     function initVault(user, links) {
@@ -741,7 +749,6 @@
                 const isDev = String(session.role).toLowerCase().includes('developer');
                 document.getElementById('logs-btn').style.display = isDev ? "block" : "none";
                 document.getElementById('maint-btn').style.display = isDev ? "block" : "none";
-                document.getElementById('bio-toggle-btn').style.display = isDev ? "block" : "none";
                 document.getElementById('page-tab-btn').style.display = isDev ? "block" : "none";
                 document.getElementById('sec-tab-btn').style.display = isDev ? "block" : "none";
                 
@@ -793,6 +800,12 @@
                 const canKick = (isDev || (!isDev && !targetIsDev)) && isOnline;
                 const logoutBtn = canKick ? `<button class="btn-small btn-red" onclick="forceDisconnect('${u.username}', this)">Logout</button>` : `<span style="color:#555;">-</span>`;
 
+                // BIOMETRIC TOGGLE RENDER
+                const bioDisabled = u.bioStatus === 'Disabled';
+                const bioBtnClass = bioDisabled ? 'btn-red' : 'btn-green';
+                const bioText = bioDisabled ? 'Bio: OFF' : 'Bio: ON';
+                const bioBtnHtml = `<button class="btn-small ${bioBtnClass}" onclick="toggleBioAccess('${u.username}')" style="margin-right: 5px;">${bioText}</button>`;
+
                 return `<tr>
                     <td><input type="checkbox" class="user-select" value="${u.username}"></td>
                     <td><span class="badge-id">${u.id}</span></td>
@@ -800,7 +813,10 @@
                     <td style="color:#888;">${u.role}</td>
                     <td style="white-space: nowrap;">${statusHtml}</td>
                     <td>${logoutBtn}</td>
-                    <td style="text-align: right;"><button class="btn-small" onclick="showEditUser('${u.id}')">Edit</button></td>
+                    <td style="text-align: right; white-space: nowrap;">
+                        ${bioBtnHtml}
+                        <button class="btn-small" onclick="showEditUser('${u.id}')">Edit</button>
+                    </td>
                 </tr>`;
             }).join('');
 
@@ -827,10 +843,6 @@
                 const btn = document.getElementById('maint-btn');
                 btn.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF";
                 btn.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
-                const bioBtn = document.getElementById('bio-toggle-btn');
-                const bioOn = masterData.bioEnabled !== false;
-                bioBtn.innerText = bioOn ? "Biometrics: ON" : "Biometrics: OFF";
-                bioBtn.className = bioOn ? "btn-bio-on" : "btn-bio-off";
             }
             if(document.getElementById('logs-modal').style.display === 'flex') renderLogs();
         } catch(e) { clearInterval(window.dbLoadingInterval); if(tbody.innerHTML.includes("Loading")) tbody.innerHTML = "<tr><td colspan='7' class='error-msg' style='text-align:center; padding:20px;'>Database Error.</td></tr>"; }
@@ -877,16 +889,6 @@
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure')); const btn = document.getElementById('maint-btn');
         masterData.maintenance = !masterData.maintenance; btn.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF"; btn.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
         fetch(API, postConfig({ action: "toggle_maintenance", state: masterData.maintenance, operatorId: session.id, operatorName: session.name })).then(() => refreshDB()); 
-    }
-
-    async function toggleBiometrics() {
-        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        const bioBtn = document.getElementById('bio-toggle-btn');
-        const currentlyOn = masterData.bioEnabled !== false;
-        masterData.bioEnabled = !currentlyOn;
-        bioBtn.innerText = masterData.bioEnabled ? "Biometrics: ON" : "Biometrics: OFF";
-        bioBtn.className = masterData.bioEnabled ? "btn-bio-on" : "btn-bio-off";
-        fetch(API, postConfig({ action: "toggle_biometrics", state: masterData.bioEnabled, operatorId: session.id, operatorName: session.name })).then(() => refreshDB());
     }
 
     async function forceDisconnect(target, btnElement) {
