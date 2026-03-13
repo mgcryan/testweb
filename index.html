@@ -578,7 +578,7 @@
                 rp: { name: "mgcryan Secure", id: document.location.hostname },
                 user: { id: Uint8Array.from(tempBioUsername, c => c.charCodeAt(0)), name: tempBioUsername, displayName: tempBioUsername },
                 pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "required", requireResidentKey: true },
                 timeout: 60000
             };
             const cred = await navigator.credentials.create({ publicKey: pubKey });
@@ -601,9 +601,6 @@
     }
 
     async function loginBiometric() {
-        const u = document.getElementById('user').value.trim();
-        if(!u) return alert("Please enter your Username to use Biometric Login.");
-        
         try {
             setUIState('bio-btn', true, "Awaiting Biometrics...");
             const pubKey = {
@@ -614,7 +611,7 @@
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
             
-            const res = await fetch(API, postConfig({ action: "login_bio", username: u, bioId: bioId }));
+            const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId }));
             const text = await res.text();
             
             if (text === "401" || text.startsWith("ERROR:")) { 
