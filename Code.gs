@@ -1,5 +1,5 @@
 /**
- * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + BIOMETRICS)
+ * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + BIOMETRICS + ADMIN CONTROLS)
  */
 
 function sha256(str) {
@@ -20,15 +20,13 @@ function setupSheet(ss, name, headers) {
 
 function ensureUserColumns(sheet) {
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID"]);
+    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID", "BioStatus"]);
     return;
   }
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   if (String(headers[0]).trim().toUpperCase() !== "ID") sheet.insertColumnBefore(1);
-  // Ensure the 8th column exists for BiometricID
-  if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") {
-     sheet.getRange(1, 8).setValue("BiometricID");
-  }
+  if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") { sheet.getRange(1, 8).setValue("BiometricID"); }
+  if (sheet.getLastColumn() < 9 || headers[8] !== "BioStatus") { sheet.getRange(1, 9).setValue("BioStatus"); }
 }
 
 function getNextId(sheet, prefix) {
@@ -82,7 +80,7 @@ function doPost(e) {
     if (data.action === "setup_system") {
       if (userSheet.getLastRow() > 1) return ContentService.createTextOutput("403");
       const newId = "MGC-0001";
-      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", ""]);
+      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled"]);
       if(secSheet.getLastRow() === 0) secSheet.appendRow(["Encrypted_Security_Keys"]);
       secSheet.appendRow([sha256(data.securityKey)]);
       logSheet.appendRow([dateStr, timeStr, newId, data.username, "System", "Initialized Root Developer Account"]);
@@ -94,12 +92,27 @@ function doPost(e) {
       return ContentService.createTextOutput("200");
     }
 
+    // TOGGLE BIOMETRICS (ADMIN CONTROL)
+    if (data.action === "toggle_bio") {
+      const rows = userSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
+          const currentStatus = String(rows[i][8]).trim() === "Disabled" ? "Enabled" : "Disabled";
+          userSheet.getRange(i + 1, 9).setValue(currentStatus);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} set Biometric login to ${currentStatus}`]);
+          return ContentService.createTextOutput("200");
+        }
+      }
+      return ContentService.createTextOutput("404");
+    }
+
     // WEB AUTH BIOMETRIC REGISTRATION
     if (data.action === "register_bio") {
       const rows = userSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.username).trim()) {
           userSheet.getRange(i + 1, 8).setValue(data.bioId);
+          userSheet.getRange(i + 1, 9).setValue("Enabled"); // Auto enable on fresh registration
           logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Security", "Registered Biometric Passkey"]);
           return ContentService.createTextOutput("200");
         }
@@ -107,14 +120,17 @@ function doPost(e) {
       return ContentService.createTextOutput("404");
     }
 
-    // WEB AUTH BIOMETRIC LOGIN (Usernameless)
+    // WEB AUTH BIOMETRIC LOGIN (Usernameless + Speed Optimized)
     if (data.action === "login_bio") {
-      if (getSetting(settingsSheet, "BIOMETRICS_ENABLED") === "false") return ContentService.createTextOutput("403");
       const rows = userSheet.getDataRange().getValues();
       const isMaint = getSetting(settingsSheet, "MAINTENANCE") === "true";
       for (let i = 1; i < rows.length; i++) {
         const storedBio = String(rows[i][7]).trim();
         if (storedBio !== "" && storedBio === data.bioId) {
+          
+          const bioStatus = String(rows[i][8]).trim();
+          if (bioStatus === "Disabled") return ContentService.createTextOutput("403_BIO");
+
           const matchedUsername = String(rows[i][1]).trim();
           const role = String(rows[i][3]).trim();
           const userId = String(rows[i][0]).trim();
@@ -123,9 +139,9 @@ function doPost(e) {
           
           if (sessionSheet.getLastRow() > 1) {
             const sessions = sessionSheet.getDataRange().getValues();
-            const keepSessions = sessions.filter((r, i) => i === 0 || String(r[1]).trim() !== matchedUsername);
-            sessionSheet.clearContents();
-            if (keepSessions.length > 0) sessionSheet.getRange(1, 1, keepSessions.length, sessions[0].length).setValues(keepSessions);
+            for(let s = sessions.length - 1; s >= 1; s--) {
+              if(String(sessions[s][1]).trim() === matchedUsername) sessionSheet.deleteRow(s + 1);
+            }
           }
           
           const sessionToken = Utilities.getUuid();
@@ -164,6 +180,7 @@ function doPost(e) {
           const role = String(rows[i][3]).trim();
           const userId = String(rows[i][0]).trim();
           const hasBio = String(rows[i][7]).trim() !== "";
+          const bioStatus = String(rows[i][8]).trim() || "Enabled";
           
           if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
           
@@ -193,7 +210,8 @@ function doPost(e) {
             status: "200", token: sessionToken,
             user: { id: userId, username: rows[i][1], role: rows[i][3], name: rows[i][4] },
             links: allowedPages,
-            bioEnabled: hasBio
+            bioEnabled: hasBio,
+            bioStatus: bioStatus
           }));
         }
       }
@@ -228,12 +246,6 @@ function doPost(e) {
         }
       }
       logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Turned Maintenance Mode ON" : "Turned Maintenance Mode OFF"]);
-      return ContentService.createTextOutput("200");
-    }
-
-    if (data.action === "toggle_biometrics") {
-      updateSetting(settingsSheet, "BIOMETRICS_ENABLED", data.state === true ? "true" : "false");
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Enabled Biometric Login" : "Disabled Biometric Login"]);
       return ContentService.createTextOutput("200");
     }
 
@@ -341,7 +353,7 @@ function doPost(e) {
         }
       } else {
         const newId = getNextId(userSheet, "MGC");
-        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", ""]);
+        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled"]);
         logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} added new user ${data.username}`]);
         return ContentService.createTextOutput("200");
       }
@@ -415,7 +427,7 @@ function doGet(e) {
         const uData = userSheet.getDataRange().getValues().slice(1);
         devs = uData.filter(r => String(r[3]).toLowerCase().includes('developer')).map(r => String(r[1]).toLowerCase());
       }
-      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, devs: devs, isSetup: isSetup, bioEnabled: settingsSheet ? getSetting(settingsSheet, "BIOMETRICS_ENABLED") !== "false" : true })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, devs: devs, isSetup: isSetup })).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (!userSheet) return ContentService.createTextOutput("ERROR: 'Users' sheet missing.");
@@ -440,7 +452,8 @@ function doGet(e) {
 
     const users = userSheet.getDataRange().getValues().slice(1).map(r => {
       const isOnline = activeUsernames.includes(String(r[1]).trim());
-      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline' };
+      // Append BioStatus mapped from 9th column
+      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled' };
     });
     const logs = logSheet && logSheet.getLastRow() > 1 ? logSheet.getDataRange().getValues().slice(1).reverse() : [];
     const pages = pageSheet && pageSheet.getLastRow() > 1 ?
@@ -448,10 +461,9 @@ function doGet(e) {
       
     let activeUsers = users.filter(u => u.status === 'Online');
     const keyCount = secSheet ? Math.max(0, secSheet.getLastRow() - 1) : 0;
-    const bioEnabled = settingsSheet ? getSetting(settingsSheet, "BIOMETRICS_ENABLED") !== "false" : true;
     
     return ContentService.createTextOutput(JSON.stringify({
-      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, keyCount: keyCount, bioEnabled: bioEnabled
+      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, keyCount: keyCount
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch(err) {
