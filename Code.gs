@@ -107,48 +107,47 @@ function doPost(e) {
       return ContentService.createTextOutput("404");
     }
 
-    // WEB AUTH BIOMETRIC LOGIN
+    // WEB AUTH BIOMETRIC LOGIN (Usernameless)
     if (data.action === "login_bio") {
       const rows = userSheet.getDataRange().getValues();
       const isMaint = getSetting(settingsSheet, "MAINTENANCE") === "true";
       for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][1]).trim() === String(data.username).trim()) {
-          const storedBio = String(rows[i][7]).trim();
-          if (storedBio !== "" && storedBio === data.bioId) {
-            const role = String(rows[i][3]).trim();
-            const userId = String(rows[i][0]).trim();
-            
-            if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
-            
-            if (sessionSheet.getLastRow() > 1) {
-              const sessions = sessionSheet.getDataRange().getValues();
-              for(let s = sessions.length - 1; s >= 1; s--) {
-                if(String(sessions[s][1]).trim() === String(data.username).trim()) sessionSheet.deleteRow(s + 1);
-              }
+        const storedBio = String(rows[i][7]).trim();
+        if (storedBio !== "" && storedBio === data.bioId) {
+          const matchedUsername = String(rows[i][1]).trim();
+          const role = String(rows[i][3]).trim();
+          const userId = String(rows[i][0]).trim();
+          
+          if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
+          
+          if (sessionSheet.getLastRow() > 1) {
+            const sessions = sessionSheet.getDataRange().getValues();
+            for(let s = sessions.length - 1; s >= 1; s--) {
+              if(String(sessions[s][1]).trim() === matchedUsername) sessionSheet.deleteRow(s + 1);
             }
-            
-            const sessionToken = Utilities.getUuid();
-            userSheet.getRange(i + 1, 7).setValue("Online");
-            sessionSheet.appendRow([userId, rows[i][1], role, dateStr, timeStr, sessionToken]);
-            logSheet.appendRow([dateStr, timeStr, userId, rows[i][1], "Web App", "Logged into Web App via Biometrics"]);
-            
-            let allowedPages = [];
-            if (pageSheet.getLastRow() > 1) {
-              const pages = pageSheet.getDataRange().getValues().slice(1);
-              pages.forEach(p => {
-                const access = String(p[3]).toUpperCase();
-                const pStatus = String(p[4] || "Visible").trim();
-                if (pStatus !== "Hidden" && (access === "ALL" || access.includes(userId))) allowedPages.push({ title: p[1], url: p[2] });
-              });
-            }
-
-            return ContentService.createTextOutput(JSON.stringify({
-              status: "200", token: sessionToken,
-              user: { id: userId, username: rows[i][1], role: rows[i][3], name: rows[i][4] },
-              links: allowedPages,
-              bioEnabled: true
-            }));
           }
+          
+          const sessionToken = Utilities.getUuid();
+          userSheet.getRange(i + 1, 7).setValue("Online");
+          sessionSheet.appendRow([userId, matchedUsername, role, dateStr, timeStr, sessionToken]);
+          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Biometrics"]);
+          
+          let allowedPages = [];
+          if (pageSheet.getLastRow() > 1) {
+            const pages = pageSheet.getDataRange().getValues().slice(1);
+            pages.forEach(p => {
+              const access = String(p[3]).toUpperCase();
+              const pStatus = String(p[4] || "Visible").trim();
+              if (pStatus !== "Hidden" && (access === "ALL" || access.includes(userId))) allowedPages.push({ title: p[1], url: p[2] });
+            });
+          }
+
+          return ContentService.createTextOutput(JSON.stringify({
+            status: "200", token: sessionToken,
+            user: { id: userId, username: matchedUsername, role: rows[i][3], name: rows[i][4] },
+            links: allowedPages,
+            bioEnabled: true
+          }));
         }
       }
       return ContentService.createTextOutput("401");
