@@ -1,5 +1,5 @@
 /**
- * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + UNIVERSAL PASSKEY + ELITE DB ACCESS)
+ * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + UNIVERSAL PASSKEY + ELITE DB ACCESS + FORCE RESETS)
  */
 
 function sha256(str) {
@@ -20,7 +20,7 @@ function setupSheet(ss, name, headers) {
 
 function ensureUserColumns(sheet) {
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID", "BioStatus", "DB_Access"]);
+    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID", "BioStatus", "DB_Access", "ForceReset"]);
     return;
   }
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -28,6 +28,7 @@ function ensureUserColumns(sheet) {
   if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") { sheet.getRange(1, 8).setValue("BiometricID"); }
   if (sheet.getLastColumn() < 9 || headers[8] !== "BioStatus") { sheet.getRange(1, 9).setValue("BioStatus"); }
   if (sheet.getLastColumn() < 10 || headers[9] !== "DB_Access") { sheet.getRange(1, 10).setValue("DB_Access"); }
+  if (sheet.getLastColumn() < 11 || headers[10] !== "ForceReset") { sheet.getRange(1, 11).setValue("ForceReset"); }
 }
 
 function getNextId(sheet, prefix) {
@@ -80,6 +81,7 @@ function doPost(e) {
     const settingsSheet = setupSheet(ss, "Settings", ["Key", "Value"]);
     const pageSheet = setupSheet(ss, "Pages", ["Page_ID", "Title", "URL", "Allowed_Users", "Status"]);
     const secSheet = setupSheet(ss, "Security", ["Encrypted_Security_Keys"]); 
+    const appSheet = setupSheet(ss, "Approvals", ["Req_ID", "Username", "Type", "NewHash", "Status", "Date"]);
     
     const d = new Date();
     const dateStr = "'" + Utilities.formatDate(d, "GMT+5:30", "yyyy-MM-dd");
@@ -88,7 +90,7 @@ function doPost(e) {
     if (data.action === "setup_system") {
       if (userSheet.getLastRow() > 1) return ContentService.createTextOutput("403");
       const newId = data.devId ? data.devId.trim() : "MGC-0001";
-      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled", "Users,Pages,Security,Settings"]);
+      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled", "Users,Pages,Security,Settings,Approvals", ""]);
       if(secSheet.getLastRow() === 0) secSheet.appendRow(["Encrypted_Security_Keys"]);
       secSheet.appendRow([sha256(data.securityKey)]);
       logSheet.appendRow([dateStr, timeStr, newId, data.username, "System", "Initialized Root Developer Account"]);
@@ -98,6 +100,73 @@ function doPost(e) {
     if (data.action === "log_action") {
       logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.target, data.details]);
       return ContentService.createTextOutput("200");
+    }
+
+    if (data.action === "request_reset") {
+      const reqId = "REQ-" + Utilities.getUuid().substring(0,6).toUpperCase();
+      appSheet.appendRow([reqId, data.username, data.type, sha256(data.newPassword), "Pending", dateStr + " " + timeStr]);
+      logSheet.appendRow([dateStr, timeStr, "SYSTEM", "User", data.username, `Requested ${data.type} Reset/Setup`]);
+      return ContentService.createTextOutput("200");
+    }
+
+    if (data.action === "resolve_reset") {
+      const appRows = appSheet.getDataRange().getValues();
+      for (let j = 1; j < appRows.length; j++) {
+        if (String(appRows[j][0]) === String(data.reqId)) {
+          if (data.decision === "Approve") {
+            const rows = userSheet.getDataRange().getValues();
+            for (let i = 1; i < rows.length; i++) {
+              if (String(rows[i][1]).trim() === String(appRows[j][1]).trim()) {
+                if (appRows[j][2] === "Password") {
+                  userSheet.getRange(i + 1, 3).setValue(appRows[j][3]);
+                } else if (appRows[j][2] === "AuthCode") {
+                  userSheet.getRange(i + 1, 6).setValue(appRows[j][3]);
+                }
+                break;
+              }
+            }
+          }
+          appSheet.deleteRow(j + 1);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, appRows[j][1], `${data.decision}d ${appRows[j][2]} request`]);
+          return ContentService.createTextOutput("200");
+        }
+      }
+      return ContentService.createTextOutput("404");
+    }
+
+    if (data.action === "set_force_reset") {
+      const rows = userSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
+           let current = String(rows[i][10] || "").trim();
+           if (!current.includes(data.resetType)) {
+               current = current ? current + "," + data.resetType : data.resetType;
+               userSheet.getRange(i + 1, 11).setValue(current);
+           }
+           logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `Mandated ${data.resetType} change`]);
+           return ContentService.createTextOutput("200");
+        }
+      }
+      return ContentService.createTextOutput("404");
+    }
+
+    if (data.action === "execute_force_reset") {
+      const rows = userSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.username).trim()) {
+           if (data.type === "Password") {
+               userSheet.getRange(i + 1, 3).setValue(sha256(data.newHash));
+           } else if (data.type === "AuthCode") {
+               userSheet.getRange(i + 1, 6).setValue(sha256(data.newHash));
+           }
+           let current = String(rows[i][10] || "").trim();
+           current = current.split(',').filter(x => x !== data.type).join(',');
+           userSheet.getRange(i + 1, 11).setValue(current);
+           logSheet.appendRow([dateStr, timeStr, "SYSTEM", data.username, data.username, `Completed mandatory ${data.type} update`]);
+           return ContentService.createTextOutput("200");
+        }
+      }
+      return ContentService.createTextOutput("404");
     }
 
     if (data.action === "update_inline_access") {
@@ -148,6 +217,12 @@ function doPost(e) {
       const rows = userSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.username).trim()) {
+          
+          const forceReset = String(rows[i][10] || "").trim();
+          if (forceReset.includes("AuthCode")) {
+             return ContentService.createTextOutput("FORCE_AUTH");
+          }
+
           if (String(rows[i][7]).trim() === String(data.bioId).trim() && String(rows[i][8]).trim() !== "Disabled") {
             logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management via Passkey"]);
             return ContentService.createTextOutput("200");
@@ -169,14 +244,19 @@ function doPost(e) {
         const storedBio = String(rows[i][7]).trim();
         if (storedBio !== "" && storedBio === data.bioId) {
           
+          const matchedUsername = String(rows[i][1]).trim();
           const role = String(rows[i][3]).trim();
+          const userId = String(rows[i][0]).trim();
+          
+          const forceReset = String(rows[i][10] || "").trim();
+          if (forceReset.includes("Password")) {
+             return ContentService.createTextOutput(JSON.stringify({ status: "FORCE_PASS", username: matchedUsername }));
+          }
+
           if (!passkeyLogin && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("403_PASSKEY_LOGIN");
 
           const bioStatus = String(rows[i][8]).trim();
           if (bioStatus === "Disabled") return ContentService.createTextOutput("403_BIO");
-
-          const matchedUsername = String(rows[i][1]).trim();
-          const userId = String(rows[i][0]).trim();
           
           if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
           
@@ -203,7 +283,7 @@ function doPost(e) {
           }));
         }
       }
-      return ContentService.createTextOutput("401");
+      return ContentService.createTextOutput("401_PASS");
     }
 
     if (data.action === "login") {
@@ -211,40 +291,52 @@ function doPost(e) {
       const isMaint = getSetting(settingsSheet, "MAINTENANCE") === "true";
       const hashedAttempt = sha256(data.password);
       
+      let userFound = false;
       for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][1]).trim() === String(data.username).trim() && String(rows[i][2]).trim() === hashedAttempt) {
-          const role = String(rows[i][3]).trim();
-          const userId = String(rows[i][0]).trim();
-          const hasBio = String(rows[i][7]).trim() !== "";
-          const bioStatus = String(rows[i][8]).trim() || "Enabled";
-          
-          if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
-          
-          const sessionToken = Utilities.getUuid();
-          userSheet.getRange(i + 1, 7).setValue("Online");
-          sessionSheet.appendRow([userId, rows[i][1], role, dateStr, timeStr, sessionToken]);
-          logSheet.appendRow([dateStr, timeStr, userId, rows[i][1], "Web App", "Logged into Web App"]);
-          
-          let allowedPages = [];
-          if (pageSheet.getLastRow() > 1) {
-            const pages = pageSheet.getDataRange().getValues().slice(1);
-            pages.forEach(p => {
-              const access = String(p[3]).toUpperCase();
-              const pStatus = String(p[4] || "Visible").trim(); 
-              if (pStatus !== "Hidden" && (access === "ALL" || access.includes(userId))) allowedPages.push({ title: p[1], url: p[2] });
-            });
-          }
+        if (String(rows[i][1]).trim() === String(data.username).trim()) {
+          userFound = true;
+          if (String(rows[i][2]).trim() === hashedAttempt) {
+            
+            const matchedUsername = String(rows[i][1]).trim();
+            const role = String(rows[i][3]).trim();
+            const userId = String(rows[i][0]).trim();
+            
+            const forceReset = String(rows[i][10] || "").trim();
+            if (forceReset.includes("Password")) {
+               return ContentService.createTextOutput(JSON.stringify({ status: "FORCE_PASS", username: matchedUsername }));
+            }
 
-          return ContentService.createTextOutput(JSON.stringify({
-            status: "200", token: sessionToken,
-            user: { id: userId, username: rows[i][1], role: rows[i][3], name: rows[i][4], dbAccess: rows[i][9] || '', hasBio: hasBio, bioStatus: bioStatus },
-            links: allowedPages,
-            bioEnabled: hasBio,
-            bioStatus: bioStatus
-          }));
+            const hasBio = String(rows[i][7]).trim() !== "";
+            const bioStatus = String(rows[i][8]).trim() || "Enabled";
+            
+            if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
+            
+            const sessionToken = Utilities.getUuid();
+            userSheet.getRange(i + 1, 7).setValue("Online");
+            sessionSheet.appendRow([userId, matchedUsername, role, dateStr, timeStr, sessionToken]);
+            logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App"]);
+            
+            let allowedPages = [];
+            if (pageSheet.getLastRow() > 1) {
+              const pages = pageSheet.getDataRange().getValues().slice(1);
+              pages.forEach(p => {
+                const access = String(p[3]).toUpperCase();
+                const pStatus = String(p[4] || "Visible").trim(); 
+                if (pStatus !== "Hidden" && (access === "ALL" || access.includes(userId))) allowedPages.push({ title: p[1], url: p[2] });
+              });
+            }
+
+            return ContentService.createTextOutput(JSON.stringify({
+              status: "200", token: sessionToken,
+              user: { id: userId, username: matchedUsername, role: rows[i][3], name: rows[i][4], dbAccess: rows[i][9] || '', hasBio: hasBio, bioStatus: bioStatus },
+              links: allowedPages,
+              bioEnabled: hasBio,
+              bioStatus: bioStatus
+            }));
+          }
         }
       }
-      return ContentService.createTextOutput("401");
+      return ContentService.createTextOutput(userFound ? "401_PASS" : "404_USER");
     }
 
     if (data.action === "verify_auth") {
@@ -252,7 +344,19 @@ function doPost(e) {
       const hashedAuthAttempt = sha256(data.authCode);
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.username).trim()) {
-          if (String(rows[i][5]).trim() === hashedAuthAttempt) {
+          
+          const forceReset = String(rows[i][10] || "").trim();
+          if (forceReset.includes("AuthCode")) {
+             return ContentService.createTextOutput("FORCE_AUTH");
+          }
+
+          const storedAuth = String(rows[i][5]).trim();
+          
+          if (storedAuth === "") {
+             return ContentService.createTextOutput("403_SETUP_REQUIRED");
+          }
+          
+          if (storedAuth === hashedAuthAttempt) {
             logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management"]);
             return ContentService.createTextOutput("200");
           } else {
@@ -397,7 +501,6 @@ function doPost(e) {
           }
         }
       } else {
-        // ID Generation Logic (Custom vs Auto)
         let newId = "";
         if (data.customId && data.customId !== "") {
             const idExists = rows.some(r => String(r[0]).trim().toUpperCase() === String(data.customId).trim().toUpperCase());
@@ -407,7 +510,7 @@ function doPost(e) {
             newId = getNextId(userSheet, "MGC");
         }
 
-        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled", data.dbAccess || ""]);
+        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled", data.dbAccess || "", ""]);
         logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} added new user ${data.username} (${newId})`]);
         return ContentService.createTextOutput("200");
       }
@@ -490,6 +593,7 @@ function doGet(e) {
     const sessionSheet = ss.getSheetByName("Sessions");
     const pageSheet = ss.getSheetByName("Pages");
     const secSheet = ss.getSheetByName("Security");
+    const appSheet = setupSheet(ss, "Approvals", ["Req_ID", "Username", "Type", "NewHash", "Status", "Date"]);
     
     let activeUsernames = [];
     let validTokens = [];
@@ -508,8 +612,16 @@ function doGet(e) {
     const users = userSheet.getDataRange().getValues().slice(1).map(r => {
       const isOnline = activeUsernames.includes(String(r[1]).trim());
       const hasBioData = String(r[7]).trim() !== "";
-      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled', dbAccess: r[9] || '', hasBio: hasBioData };
+      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled', dbAccess: r[9] || '', forceReset: r[10] || '', hasBio: hasBioData };
     });
+    
+    let approvals = [];
+    if (appSheet && appSheet.getLastRow() > 1) {
+        approvals = appSheet.getDataRange().getValues().slice(1)
+            .filter(r => r[4] === "Pending")
+            .map(r => ({ id: r[0], username: r[1], type: r[2], hash: r[3], status: r[4], date: r[5] }));
+    }
+
     const logs = logSheet && logSheet.getLastRow() > 1 ? logSheet.getDataRange().getValues().slice(1).reverse() : [];
     const pages = pageSheet && pageSheet.getLastRow() > 1 ?
       pageSheet.getDataRange().getValues().slice(1).map(r => ({ id: r[0], title: r[1], url: r[2], allowed: r[3], status: r[4] || 'Visible' })) : [];
@@ -518,7 +630,7 @@ function doGet(e) {
     const keyCount = secSheet ? Math.max(0, secSheet.getLastRow() - 1) : 0;
     
     return ContentService.createTextOutput(JSON.stringify({
-      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, passkeyLogin: passkeyLogin, keyCount: keyCount
+      users, logs, pages, approvals, active: activeUsers, validTokens: validTokens, maintenance: maint, passkeyLogin: passkeyLogin, keyCount: keyCount
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch(err) {
