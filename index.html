@@ -55,14 +55,14 @@
         .db-action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;}
         .db-action-bar > div { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;}
         
-        .btn-small { width: auto; padding: 8px 12px; font-size: 10px; background: transparent; border: 1px solid #aaa; color: #aaa; border-radius: 4px; margin:0; transition: 0.2s;}
-        .btn-small:hover { background: #333; color: #fff; border-color: #fff; }
+        .btn-small { width: auto; padding: 8px 12px; font-size: 10px; background: transparent; border: 1px solid #aaa; color: #aaa; border-radius: 4px; margin:0; transition: 0.2s; cursor: pointer;}
+        .btn-small:hover:not(:disabled) { background: #333; color: #fff; border-color: #fff; }
         .btn-red { border-color: var(--red); color: var(--red); }
-        .btn-red:hover { background: var(--red); color: white; border-color: var(--red); box-shadow: 0 0 10px rgba(255,42,85,0.5); }
+        .btn-red:hover:not(:disabled) { background: var(--red); color: white; border-color: var(--red); box-shadow: 0 0 10px rgba(255,42,85,0.5); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
-        .btn-gold:hover { background: var(--gold); color: black; border-color: var(--gold); }
+        .btn-gold:hover:not(:disabled) { background: var(--gold); color: black; border-color: var(--gold); }
         .btn-green { border-color: var(--green); color: var(--green); }
-        .btn-green:hover { background: var(--green); color: black; border-color: var(--green); box-shadow: 0 0 10px rgba(0,230,118,0.5); }
+        .btn-green:hover:not(:disabled) { background: var(--green); color: black; border-color: var(--green); box-shadow: 0 0 10px rgba(0,230,118,0.5); }
         
         .btn-maint-off { background: transparent; border: 1px solid var(--grey); color: #888; }
         .btn-maint-on { background: rgba(255,42,85,0.1); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 15px rgba(255,42,85,0.2); }
@@ -113,13 +113,15 @@
                     <span class="cyber-eye eye-closed" onclick="togglePass('pass', this)"></span>
                 </div>
                 <button id="login-btn" onclick="login()">Login</button>
-                <button id="bio-btn" onclick="loginBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 5px;">🧬 Face / Fingerprint Login</button>
+                <button id="bio-btn" onclick="loginBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 5px;">🧬 Passkey Login</button>
                 <div id="login-status" class="status-msg"></div>
             </div>
 
             <div id="vault-zone" style="display:none; text-align:center;">
-                <div id="dynamic-links-container" style="margin-bottom: 20px;"></div>
+                <div id="dynamic-links-container" style="margin-bottom: 15px;"></div>
+                
                 <button id="db-btn" onclick="openDBAuth()" style="display:none; background: transparent; border: 1px solid var(--blue); color: var(--blue);">User Management</button>
+                <button id="vault-passkey-btn" onclick="toggleMyPasskey(this)" style="display:none; background: transparent; border: 1px solid var(--green); color: var(--green); margin-top:5px;">Passkey: ON</button>
                 <button onclick="logout()" style="margin-top:10px; background: transparent; border: 1px solid var(--red); color: var(--red);">Logout</button>
             </div>
         </div>
@@ -135,8 +137,12 @@
             <h2 style="color:var(--gold); letter-spacing:2px;">SYSTEM INITIALIZATION</h2>
             <p style="color: #aaa; font-size: 10px; margin-bottom: 15px;">Database is empty. Create Root Developer Account.</p>
             
-            <input type="text" id="setup-u" placeholder="Developer Username" class="enter-tab" data-next="setup-n">
+            <div class="input-group" style="margin-bottom:0;">
+                <input type="text" id="setup-id" placeholder="Custom Developer ID (e.g. DEV-RYAN)" class="enter-tab" data-next="setup-u">
+            </div>
+            <input type="text" id="setup-u" placeholder="Developer Username" class="enter-tab" data-next="setup-n" style="margin-top:15px;">
             <input type="text" id="setup-n" placeholder="Full Name" class="enter-tab" data-next="setup-p" style="margin-top:15px;">
+            
             <div class="pass-wrapper" style="margin-top:15px; margin-bottom:5px;">
                 <input type="password" id="setup-p" placeholder="Account Password" class="enter-tab" data-next="setup-a" onkeyup="checkPwdStrength('setup-p', 'setup-btn', 'pwd-rules-setup', false)">
                 <span class="cyber-eye eye-closed" onclick="togglePass('setup-p', this)"></span>
@@ -163,6 +169,7 @@
                 <span class="cyber-eye eye-closed" onclick="togglePass('db-auth-input', this)"></span>
             </div>
             <button id="decrypt-btn" onclick="verifyDBAuth()">Verify</button>
+            <button id="db-bio-btn" onclick="verifyDBAuthBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 10px;">🧬 Passkey Auth</button>
             <button onclick="closeModals()" style="background:transparent; color: #aaa; margin-top:5px;">Cancel</button>
             <div id="decrypt-status" class="status-msg"></div>
         </div>
@@ -171,8 +178,8 @@
     <div class="modal" id="bio-setup-modal">
         <div class="glass-panel" style="width: 320px; text-align: center;">
             <h3 style="color:var(--gold); margin-top:0;">Secure Your Account</h3>
-            <p style="font-size: 11px; color:#aaa; margin-bottom:20px;">Do you want to enable Face or Fingerprint login for this device? This means you won't need to type your password next time.</p>
-            <button onclick="enrollBiometrics()" style="background:var(--gold); color:black;">Yes, Setup Biometrics</button>
+            <p style="font-size: 11px; color:#aaa; margin-bottom:20px;">Do you want to enable Passkey login for this device? This means you won't need to type your password next time.</p>
+            <button onclick="enrollBiometrics(this)" style="background:var(--gold); color:black;">Yes, Setup Passkey</button>
             <button onclick="skipBiometrics()" style="background:transparent; border: 1px solid var(--grey); color: #888; margin-top:10px;">No, Skip</button>
         </div>
     </div>
@@ -183,15 +190,15 @@
                 <span class="nav-back" onclick="closeDB()" style="margin:0;">← Close Dashboard</span>
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                     <button onclick="refreshDB()" class="btn-small" style="color:var(--blue); border-color:var(--blue); margin-right:15px;">🔄 Refresh Data</button>
-                    <button id="maint-btn" onclick="toggleMaintenance()" style="display:none; width:130px; font-size:10px;" class="btn-maint-off">Maintenance: OFF</button>
+                    <button id="settings-btn" onclick="openSettings()" style="display:none; width:100px; font-size:10px; background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold);">⚙️ Settings</button>
                     <button id="logs-btn" onclick="openLogsModal()" style="display:none; width:100px; font-size:10px; background: rgba(0,115,230,0.1); border: 1px solid var(--blue); color: var(--blue);">System Logs</button>
                 </div>
             </div>
 
             <div class="tab-bar" id="admin-tabs">
-                <div class="db-tab tab-active" onclick="switchTab('users')">Users</div>
-                <div class="db-tab" id="page-tab-btn" style="display:none;" onclick="switchTab('pages')">Pages</div>
-                <div class="db-tab" id="sec-tab-btn" style="display:none;" onclick="switchTab('security')">Security Keys</div>
+                <div class="db-tab tab-active" id="users-tab-btn" onclick="switchTab('users')" style="display:none;">Users</div>
+                <div class="db-tab" id="page-tab-btn" onclick="switchTab('pages')" style="display:none;">Pages</div>
+                <div class="db-tab" id="sec-tab-btn" onclick="switchTab('security')" style="display:none;">Security Keys</div>
             </div>
             
             <div id="tab-users" class="tab-content content-active">
@@ -201,8 +208,8 @@
                         <input type="password" id="bulk-sec-key" placeholder="Security Key" style="width: 100px; padding: 8px; font-size: 10px; margin: 0; display:none;">
                         <button onclick="bulkDelete()" id="btn-bulk-del" class="btn-small btn-red" style="border: 1px solid var(--red);">Delete Selected</button>
                         <button onclick="bulkLogout()" id="btn-bulk-out" class="btn-small btn-gold">Logout Selected</button>
-                        <button onclick="showEditUser(null, 'Admin')" id="btn-add-admin" style="width:90px; font-size:10px; margin:0; background: transparent; color:var(--blue); border: 1px solid var(--blue); display:none;">+ Add Admin</button>
-                        <button onclick="showEditUser(null)" style="width:90px; font-size:10px; margin:0; background: var(--blue); color:white; border:none;">+ Add User</button>
+                        <button onclick="showEditUser('', 'Admin')" id="btn-add-admin" style="width:90px; font-size:10px; margin:0; background: transparent; color:var(--blue); border: 1px solid var(--blue); display:none;">+ Add Admin</button>
+                        <button onclick="showEditUser('')" style="width:90px; font-size:10px; margin:0; background: var(--blue); color:white; border:none;">+ Add User</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -210,12 +217,12 @@
                         <thead>
                             <tr>
                                 <th style="width: 5%;"><input type="checkbox" id="selectAll" onclick="toggleAllUsers(this)"></th>
-                                <th style="width: 12%;">ID</th>
-                                <th style="width: 22%;">Username</th>
-                                <th style="width: 12%;">Role</th>
-                                <th style="width: 14%;">Status</th>
-                                <th style="width: 15%;">Session</th>
-                                <th style="width: 20%; text-align: right;">Action</th>
+                                <th style="width: 10%;">ID</th>
+                                <th style="width: 15%;">Username</th>
+                                <th style="width: 10%;">Role</th>
+                                <th style="width: 12%;">Status</th>
+                                <th style="width: 23%;">DB Access</th>
+                                <th style="width: 25%; text-align: right;">Action</th>
                             </tr>
                         </thead>
                         <tbody id="user-body"></tbody>
@@ -266,6 +273,17 @@
         </div>
     </div>
 
+    <div class="modal" id="settings-modal">
+        <div class="modal-content" style="max-width: 400px; padding: 25px; box-sizing: border-box; text-align:center;">
+            <span class="nav-back" onclick="closeSettings()" style="text-align:left;">← Back to Database</span>
+            <h3 style="color:#fff; margin-bottom:15px; margin-top:0;">Global System Settings</h3>
+            <p style="font-size:10px; color:#aaa; margin-bottom: 20px;">Manage system-wide states. Changes affect all users immediately.</p>
+            
+            <button id="maint-btn" onclick="toggleMaintenance(this)" style="margin-bottom:15px;" class="btn-maint-off">Maintenance: OFF</button>
+            <button id="global-passkey-btn" onclick="toggleGlobalPasskey(this)" style="margin-bottom:10px;" class="btn-maint-off">Passkey Login: ON</button>
+        </div>
+    </div>
+
     <div class="modal" id="logs-modal">
         <div class="modal-content" style="max-width: 1000px;">
             <span class="nav-back" onclick="backToDBFromLogs()">← Back to Database</span>
@@ -299,6 +317,14 @@
                 <label style="font-size:10px; color:#aaa;">Username</label>
                 <span id="user-availability" style="font-size:10px; font-weight:bold;"></span>
             </div>
+            
+            <div id="custom-id-box" style="display:none; margin-bottom:5px;">
+                <label style="font-size:10px; color:#aaa;">Custom User ID <span style="font-size:8px; color:var(--gold);">(Optional - Leave blank for Auto)</span></label>
+                <div class="input-group" style="margin-bottom:10px;">
+                    <input type="text" id="edit-custom-id" class="enter-tab" data-next="edit-u" placeholder="e.g. DEV-RYAN">
+                </div>
+            </div>
+
             <div class="input-group">
                 <input type="text" id="edit-u" class="enter-tab" data-next="edit-p" onkeyup="checkUsername()">
             </div>
@@ -327,6 +353,16 @@
                     <span class="cyber-eye eye-closed" onclick="togglePass('edit-a', this)"></span>
                 </div>
             </div>
+
+            <div id="db-access-zone" style="display:none; border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px; margin-top:15px;">
+                <label style="font-size:10px; color:var(--blue);">Granular DB Permissions</label>
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:8px;">
+                    <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Users"> Manage Users</label>
+                    <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Pages"> Manage Pages</label>
+                    <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Security"> Manage Security</label>
+                    <label id="lbl-perm-settings" class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Settings"> Manage Settings</label>
+                </div>
+            </div>
             
             <button id="commit-btn" onclick="saveUser()" style="margin-top:15px;">Save Changes</button>
             
@@ -351,10 +387,11 @@
             <div class="input-group"><input type="text" id="page-t" class="enter-tab" data-next="page-u"></div>
             
             <label style="font-size:10px; color:#aaa;">Target URL</label>
-            <div class="input-group"><input type="text" id="page-u" class="enter-tab" data-next="page-a"></div>
+            <div class="input-group"><input type="text" id="page-u" class="enter-tab"></div>
             
             <label style="font-size:10px; color:#aaa;">Allowed Access</label>
-            <div class="input-group"><input type="text" id="page-a" class="enter-tab" data-next="page-s" value="ALL"></div>
+            <div id="page-access-container" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 10px; max-height: 150px; overflow-y: auto; margin-bottom:15px;">
+                </div>
 
             <label style="font-size:10px; color:#aaa;">Visibility Status</label>
             <div class="input-group">
@@ -376,7 +413,7 @@
     let liveRadarTimer = null; 
     let phantomKillerTimer = null; 
     let masterData = null;
-    let sysData = { maintenance: false, devs: [], isSetup: false };
+    let sysData = { maintenance: false, passkeyLogin: true, devs: [], isSetup: false };
     
     let loginFailAttempts = 0;
     let loginLockoutTimer = null;
@@ -388,7 +425,6 @@
         unlock: (str) => { try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch(e){ return null; } }
     };
 
-    // WEBAUTHN / BIOMETRICS HELPERS
     function bufferToBase64url(buffer) {
         const bytes = new Uint8Array(buffer);
         let str = '';
@@ -396,7 +432,6 @@
         return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
-    // PASSWORD STRENGTH VALIDATOR
     function checkPwdStrength(inputId, btnId, msgId, isEdit = false) {
         const val = document.getElementById(inputId).value;
         const btn = document.getElementById(btnId);
@@ -424,9 +459,9 @@
     function switchTab(tabId) {
         document.querySelectorAll('.db-tab').forEach(t => t.classList.remove('tab-active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('content-active'));
-        if(tabId === 'users') { document.querySelector('.db-tab:nth-child(1)').classList.add('tab-active'); document.getElementById('tab-users').classList.add('content-active'); } 
+        if(tabId === 'users') { document.getElementById('users-tab-btn').classList.add('tab-active'); document.getElementById('tab-users').classList.add('content-active'); } 
         else if (tabId === 'pages') { document.getElementById('page-tab-btn').classList.add('tab-active'); document.getElementById('tab-pages').classList.add('content-active'); } 
-        else { document.getElementById('sec-tab-btn').classList.add('tab-active'); document.getElementById('tab-security').classList.add('content-active'); }
+        else if (tabId === 'security') { document.getElementById('sec-tab-btn').classList.add('tab-active'); document.getElementById('tab-security').classList.add('content-active'); }
     }
     
     const setUIState = (id, disabled, text, isError = false) => {
@@ -460,6 +495,7 @@
                 return;
             }
             sysData.maintenance = d.maintenance;
+            sysData.passkeyLogin = d.passkeyLogin;
             sysData.devs = d.devs || [];
             checkMaintenancePreflight();
         }).catch(e=>{});
@@ -473,10 +509,11 @@
             if(u) {
                 initVault(u, userLinks);
                 startPhantomKiller();
-                if(activeView === 'db' && (u.role.toLowerCase().includes('admin') || u.role.toLowerCase().includes('developer'))) {
+                if(activeView === 'db') {
                     document.getElementById('db-modal').style.display = 'flex';
                     document.getElementById('auth-zone').style.display = "none";
                     document.getElementById('vault-zone').style.display = "block";
+                    applyDBPermissions(u);
                     refreshDB();
                     liveRadarTimer = setInterval(refreshDB, 5000);
                 }
@@ -484,20 +521,57 @@
         }
     };
 
+    function applyDBPermissions(sessionUser) {
+        const isDev = String(sessionUser.role).toLowerCase().includes('developer');
+        const isAdmin = String(sessionUser.role).toLowerCase().includes('admin');
+        const dbAcc = sessionUser.dbAccess || "";
+        
+        const canUsers = isDev || isAdmin || dbAcc.includes('Users');
+        const canPages = isDev || isAdmin || dbAcc.includes('Pages');
+        const canSec = isDev || isAdmin || dbAcc.includes('Security');
+        const canSet = isDev || dbAcc.includes('Settings');
+
+        document.getElementById('users-tab-btn').style.display = canUsers ? "block" : "none";
+        document.getElementById('page-tab-btn').style.display = canPages ? "block" : "none";
+        document.getElementById('sec-tab-btn').style.display = canSec ? "block" : "none";
+        document.getElementById('settings-btn').style.display = canSet ? "inline-block" : "none";
+        document.getElementById('logs-btn').style.display = isDev ? "inline-block" : "none"; 
+        document.getElementById('btn-add-admin').style.display = isDev ? "inline-block" : "none"; 
+
+        if (canUsers) switchTab('users');
+        else if (canPages) switchTab('pages');
+        else if (canSec) switchTab('security');
+        else if (canSet) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('content-active'));
+            openSettings();
+        }
+    }
+
     async function setupGenesis() {
+        const devId = document.getElementById('setup-id').value.trim();
         const u = document.getElementById('setup-u').value.trim();
         const n = document.getElementById('setup-n').value.trim();
         const p = document.getElementById('setup-p').value.trim();
         const a = document.getElementById('setup-a').value.trim();
         const s = document.getElementById('setup-s').value.trim();
-        if(!u || !p || !n || !a || !s) return alert("All fields required.");
+        if(!u || !p || !n || !a || !s) return alert("All required fields must be filled.");
         
         document.getElementById('setup-btn').innerText = "Initializing...";
+        document.getElementById('setup-btn').disabled = true;
         try {
-            await fetch(API, postConfig({action: "setup_system", username: u, name: n, password: p, auth: a, securityKey: s}));
-            alert("Database Ready! You may now login.");
-            window.location.reload();
-        } catch(e) { document.getElementById('setup-btn').innerText = "Network Error"; }
+            const res = await fetch(API, postConfig({action: "setup_system", devId: devId, username: u, name: n, password: p, auth: a, securityKey: s}));
+            const text = await res.text();
+            if (text === "200") {
+                alert("Database Ready! You may now login.");
+                window.location.reload();
+            } else {
+                document.getElementById('setup-btn').innerText = "Initialization Failed";
+                document.getElementById('setup-btn').disabled = false;
+            }
+        } catch(e) { 
+            document.getElementById('setup-btn').innerText = "Network Error";
+            document.getElementById('setup-btn').disabled = false;
+        }
     }
 
     function checkMaintenancePreflight() {
@@ -561,8 +635,7 @@
                 sessionStorage.setItem('mgc_token', data.token); 
                 sessionStorage.setItem('mgc_links_sec', sysCrypt.lock(data.links || []));
                 
-                // Prompt for Biometrics only if they don't have it AND it's not disabled for their account
-                if (!data.bioEnabled && data.bioStatus !== "Disabled" && window.PublicKeyCredential) {
+                if (!data.bioEnabled && data.bioStatus !== "Disabled" && sysData.passkeyLogin !== false && window.PublicKeyCredential) {
                     tempBioUsername = u;
                     document.getElementById('bio-setup-modal').style.display = 'flex';
                 } else {
@@ -573,8 +646,12 @@
         } catch(e) { clearInterval(loadingInterval); setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = "Network Offline."; }
     }
 
-    // BIOMETRIC ENROLLMENT & LOGIN (SPEED OPTIMIZED)
-    async function enrollBiometrics() {
+    async function enrollBiometrics(btnElement) {
+        const skipBtn = btnElement.nextElementSibling;
+        btnElement.innerText = "Summoning cyber hamsters... 🐹";
+        btnElement.disabled = true;
+        skipBtn.style.display = "none";
+
         try {
             const pubKey = {
                 challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -585,13 +662,20 @@
                 timeout: 60000
             };
             const cred = await navigator.credentials.create({ publicKey: pubKey });
+            
+            btnElement.innerText = "Verifying encryption... 🔐";
+            
             const bioId = bufferToBase64url(cred.rawId);
             await fetch(API, postConfig({ action: "register_bio", username: tempBioUsername, bioId: bioId }));
-            alert("Biometric Security Enabled!");
+            
+            alert("Passkey Security Enabled!");
             skipBiometrics(); 
         } catch(e) {
             console.log(e);
-            alert("Biometric setup failed or was canceled.");
+            btnElement.innerText = "Yes, Setup Passkey";
+            btnElement.disabled = false;
+            skipBtn.style.display = "inline-block";
+            alert("Passkey setup failed or was canceled.");
         }
     }
 
@@ -605,23 +689,25 @@
 
     async function loginBiometric() {
         try {
-            // Speed Optimize: Trigger OS prompt immediately before server contact
             const pubKey = { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: document.location.hostname, userVerification: "required" };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
             
-            // UI visual feedback post-scan
             setUIState('bio-btn', true, "Authenticating...");
             
             const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId }));
             const text = await res.text();
             
-            if (text === "403_BIO") {
-                setUIState('bio-btn', false, "🧬 Face / Fingerprint Login"); 
-                document.getElementById('login-status').innerText = "Biometrics Disabled.";
-                alert("SECURITY ALERT:\n\nBiometric login has been disabled for your account by the Administrator. Please use your standard password.");
+            if (text === "403_PASSKEY_LOGIN") {
+                setUIState('bio-btn', false, "🧬 Passkey Login"); 
+                document.getElementById('login-status').innerText = "Global Passkey Offline.";
+                alert("SECURITY ALERT:\n\nPasskey login is currently disabled globally by the Administrator. Please use your standard password.");
+            } else if (text === "403_BIO") {
+                setUIState('bio-btn', false, "🧬 Passkey Login"); 
+                document.getElementById('login-status').innerText = "Passkey Disabled.";
+                alert("SECURITY ALERT:\n\nPasskey login has been disabled for your account by the Administrator. Please use your standard password.");
             } else if (text === "401" || text.startsWith("ERROR:")) { 
-                setUIState('bio-btn', false, "🧬 Face / Fingerprint Login"); document.getElementById('login-status').innerText = "Biometric Verification Failed."; 
+                setUIState('bio-btn', false, "🧬 Passkey Login"); document.getElementById('login-status').innerText = "Passkey Verification Failed."; 
             } else if (text === "503") {
                 document.getElementById('login-container').style.display = "none";
                 document.getElementById('massive-maint-block').style.display = "block";
@@ -632,19 +718,77 @@
                 sessionStorage.setItem('mgc_links_sec', sysCrypt.lock(data.links || []));
                 initVault(data.user, data.links || []);
                 startPhantomKiller();
-            } else { setUIState('bio-btn', false, "🧬 Face / Fingerprint Login"); }
+            } else { setUIState('bio-btn', false, "🧬 Passkey Login"); }
         } catch(e) {
             console.log(e);
-            setUIState('bio-btn', false, "🧬 Face / Fingerprint Login");
-            document.getElementById('login-status').innerText = "Biometrics canceled or unavailable.";
+            setUIState('bio-btn', false, "🧬 Passkey Login");
+            document.getElementById('login-status').innerText = "Passkey canceled or unavailable.";
         }
     }
 
-    // ADMIN: TOGGLE BIO ACCESS
-    async function toggleBioAccess(targetUser) {
+    async function toggleMyPasskey(btnElement) {
+        const isOff = btnElement.innerText.includes('OFF');
+        const newState = isOff ? 'Enabled' : 'Disabled';
+        
+        btnElement.innerText = "Updating...";
+        btnElement.style.pointerEvents = 'none';
+        btnElement.style.opacity = '0.5';
+
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        await fetch(API, postConfig({ action: "toggle_bio", targetUser: session.username, operatorId: session.id, operatorName: session.name }));
+        
+        session.bioStatus = newState;
+        sessionStorage.setItem('mgc_secure', sysCrypt.lock(session));
+
+        btnElement.innerText = isOff ? "Passkey: ON" : "Passkey: OFF";
+        btnElement.style.borderColor = isOff ? "var(--green)" : "var(--red)";
+        btnElement.style.color = isOff ? "var(--green)" : "var(--red)";
+        btnElement.style.pointerEvents = 'auto';
+        btnElement.style.opacity = '1';
+    }
+
+    async function togglePasskeyAccess(targetUser, btnElement) {
+        const isOff = btnElement.innerText.includes('OFF');
+        btnElement.innerText = isOff ? 'Passkey: ON' : 'Passkey: OFF';
+        btnElement.className = isOff ? 'btn-small btn-green' : 'btn-small btn-red';
+        btnElement.style.pointerEvents = 'none'; 
+        btnElement.style.opacity = '0.5';
+
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
         await fetch(API, postConfig({ action: "toggle_bio", targetUser: targetUser, operatorId: session.id, operatorName: session.name }));
-        refreshDB();
+        
+        btnElement.style.pointerEvents = 'auto';
+        btnElement.style.opacity = '1';
+    }
+
+    async function toggleInlinePerm(username, perm, btnElement) {
+        const isEnabled = btnElement.classList.contains('btn-green');
+        
+        if (isEnabled) {
+            btnElement.classList.remove('btn-green');
+            btnElement.classList.add('btn-maint-off');
+        } else {
+            btnElement.classList.remove('btn-maint-off');
+            btnElement.classList.add('btn-green');
+        }
+        btnElement.style.pointerEvents = 'none';
+        btnElement.style.opacity = '0.5';
+
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        const targetUser = masterData.users.find(u => u.username === username);
+        let accArray = targetUser.dbAccess ? targetUser.dbAccess.split(',').map(s=>s.trim()).filter(s=>s) : [];
+        
+        if (isEnabled) {
+            accArray = accArray.filter(a => a !== perm);
+        } else {
+            if (!accArray.includes(perm)) accArray.push(perm);
+        }
+        targetUser.dbAccess = accArray.join(',');
+        
+        await fetch(API, postConfig({ action: "update_inline_access", targetUser: username, dbAccess: targetUser.dbAccess, operatorId: session.id, operatorName: session.name }));
+        
+        btnElement.style.pointerEvents = 'auto';
+        btnElement.style.opacity = '1';
     }
 
     function initVault(user, links) {
@@ -652,8 +796,25 @@
         document.getElementById('vault-zone').style.display = "block";
         document.getElementById('greet').innerText = `Welcome, ${user.name}`;
         
+        const vaultBioBtn = document.getElementById('vault-passkey-btn');
+        if (user.hasBio) {
+            vaultBioBtn.style.display = "inline-block";
+            vaultBioBtn.innerText = user.bioStatus === "Disabled" ? "Passkey: OFF" : "Passkey: ON";
+            vaultBioBtn.style.borderColor = user.bioStatus === "Disabled" ? "var(--red)" : "var(--green)";
+            vaultBioBtn.style.color = user.bioStatus === "Disabled" ? "var(--red)" : "var(--green)";
+        } else {
+            vaultBioBtn.style.display = "none";
+        }
+
         const role = String(user.role).toLowerCase();
-        if(role.includes('developer') || role.includes('admin')) { document.getElementById('db-btn').style.display = "inline-block"; }
+        const dbAcc = user.dbAccess || "";
+        const hasAnyAccess = role.includes('developer') || role.includes('admin') || dbAcc.includes('Users') || dbAcc.includes('Pages') || dbAcc.includes('Security') || dbAcc.includes('Settings');
+        
+        if(hasAnyAccess) { 
+            document.getElementById('db-btn').style.display = "inline-block"; 
+        } else { 
+            document.getElementById('db-btn').style.display = "none"; 
+        }
 
         const linkCont = document.getElementById('dynamic-links-container');
         if(links && links.length > 0) { linkCont.innerHTML = links.map(l => `<a href="${l.url}" class="f-link">>> ${l.title}</a>`).join(''); } 
@@ -684,15 +845,16 @@
                     else { forcePhantomLogout("Session closed."); }
                 }
             } catch(e) {} 
-        }, 5000); 
+        }, 2000); 
     }
 
     async function forcePhantomLogout(message) {
         clearInterval(phantomKillerTimer);
         const encSession = sessionStorage.getItem('mgc_secure');
+        const token = sessionStorage.getItem('mgc_token');
         if (encSession) {
             const session = sysCrypt.unlock(encSession);
-            if(session) fetch(API, postConfig({action: "logout", username: session.username, operatorId: session.id, operatorName: session.name})).catch(e => {});
+            if(session) fetch(API, postConfig({action: "logout", username: session.username, operatorId: session.id, operatorName: session.name, token: token})).catch(e => {});
         }
         sessionStorage.clear();
         alert(`Logged Out:\n\n${message}`);
@@ -701,9 +863,10 @@
 
     async function logout() {
         const encSession = sessionStorage.getItem('mgc_secure');
+        const token = sessionStorage.getItem('mgc_token');
         if (encSession) {
             const session = sysCrypt.unlock(encSession);
-            if(session) fetch(API, postConfig({action: "logout", username: session.username, operatorId: session.id, operatorName: session.name}));
+            if(session) fetch(API, postConfig({action: "logout", username: session.username, operatorId: session.id, operatorName: session.name, token: token}));
         }
         sessionStorage.clear(); 
         document.getElementById('vault-zone').style.display = "none";
@@ -719,6 +882,14 @@
         document.getElementById('db-auth-title').innerText = title;
         document.getElementById('db-auth-modal').style.display = 'flex';
         document.getElementById('db-auth-input').value = "";
+        
+        const dbBioBtn = document.getElementById('db-bio-btn');
+        if (session.hasBio && session.bioStatus !== "Disabled") {
+            dbBioBtn.style.display = "inline-block";
+        } else {
+            dbBioBtn.style.display = "none";
+        }
+
         setUIState('decrypt-btn', false, "Verify");
         document.getElementById('db-auth-input').focus();
     }
@@ -744,21 +915,68 @@
             if (text === "200") {
                 setUIState('decrypt-btn', false, "Verify");
                 sessionStorage.setItem('mgc_view', 'db'); 
-                closeModals(); document.getElementById('db-modal').style.display = 'flex';
+                closeModals(); 
+                document.getElementById('db-modal').style.display = 'flex';
                 
-                const isDev = String(session.role).toLowerCase().includes('developer');
-                document.getElementById('logs-btn').style.display = isDev ? "block" : "none";
-                document.getElementById('maint-btn').style.display = isDev ? "block" : "none";
-                document.getElementById('page-tab-btn').style.display = isDev ? "block" : "none";
-                document.getElementById('sec-tab-btn').style.display = isDev ? "block" : "none";
+                applyDBPermissions(session);
                 
-                const isAdmin = String(session.role).toLowerCase().includes('admin');
-                document.getElementById('btn-add-admin').style.display = (isAdmin || isDev) ? "inline-block" : "none";
-
-                switchTab('users'); refreshDB(); liveRadarTimer = setInterval(refreshDB, 5000);
+                refreshDB(); 
+                liveRadarTimer = setInterval(refreshDB, 5000);
             } else { setUIState('decrypt-btn', false, "Verify", true); document.getElementById('decrypt-status').innerText = "Invalid Auth Code"; }
         } catch(e) { clearInterval(loadingInterval); setUIState('decrypt-btn', false, "Verify", true); document.getElementById('decrypt-status').innerText = "Database Offline."; }
     }
+
+    async function verifyDBAuthBiometric() {
+        const encSession = sessionStorage.getItem('mgc_secure');
+        const session = sysCrypt.unlock(encSession);
+        const dbBioBtn = document.getElementById('db-bio-btn');
+        
+        dbBioBtn.disabled = true;
+        dbBioBtn.innerText = "Authenticating...";
+
+        try {
+            const pubKey = { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: document.location.hostname, userVerification: "required" };
+            const assertion = await navigator.credentials.get({ publicKey: pubKey });
+            const bioId = bufferToBase64url(assertion.rawId);
+
+            const res = await fetch(API, postConfig({ action: "verify_auth_bio", username: session.username, bioId: bioId }));
+            const text = await res.text();
+
+            if (text === "200") {
+                dbBioBtn.disabled = false;
+                dbBioBtn.innerText = "🧬 Passkey Auth";
+                sessionStorage.setItem('mgc_view', 'db'); 
+                closeModals(); 
+                document.getElementById('db-modal').style.display = 'flex';
+                
+                applyDBPermissions(session);
+                refreshDB(); 
+                liveRadarTimer = setInterval(refreshDB, 5000);
+            } else if (text === "403") {
+                dbBioBtn.disabled = false;
+                dbBioBtn.innerText = "🧬 Passkey Auth";
+                document.getElementById('decrypt-status').innerText = "Passkey Verification Failed.";
+                document.getElementById('decrypt-status').className = "status-msg error-msg";
+            } else {
+                dbBioBtn.disabled = false;
+                dbBioBtn.innerText = "🧬 Passkey Auth";
+                document.getElementById('decrypt-status').innerText = "Passkey Not Found.";
+                document.getElementById('decrypt-status').className = "status-msg error-msg";
+            }
+        } catch(e) {
+            dbBioBtn.disabled = false;
+            dbBioBtn.innerText = "🧬 Passkey Auth";
+            document.getElementById('decrypt-status').innerText = "Passkey canceled or unavailable.";
+            document.getElementById('decrypt-status').className = "status-msg error-msg";
+        }
+    }
+
+    function openSettings() { document.getElementById('db-modal').style.display = 'none'; document.getElementById('settings-modal').style.display = 'flex'; }
+    function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; document.getElementById('db-modal').style.display = 'flex'; }
+    function openLogsModal() { document.getElementById('db-modal').style.display = 'none'; document.getElementById('logs-modal').style.display = 'flex'; renderLogs(); }
+    function backToDBFromLogs() { document.getElementById('logs-modal').style.display = 'none'; document.getElementById('db-modal').style.display = 'flex'; }
+    function closeModals() { clearInterval(liveRadarTimer); clearInterval(window.dbLoadingInterval); document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+    function backToDB() { clearInterval(liveRadarTimer); clearInterval(window.dbLoadingInterval); document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); document.getElementById('db-modal').style.display = 'flex'; refreshDB(); liveRadarTimer = setInterval(refreshDB, 5000); }
 
     function closeDB() {
         const encSession = sessionStorage.getItem('mgc_secure');
@@ -768,7 +986,7 @@
         if(session) fetch(API, postConfig({ action: "log_action", operatorId: session.id, operatorName: session.name, target: "Database", details: "Closed Database Management" }));
     }
 
-    const dbTablePhrases = ["Compiling database...", "Aligning columns...", "Waking up the hamsters..."];
+    const dbTablePhrases = ["Decrypting mainframe...", "Bribing the firewall...", "Waking up the cyber hamsters...", "Reticulating splines...", "Downloading more RAM..."];
 
     async function refreshDB() {
         if(document.querySelectorAll('.user-select:checked').length > 0) return;
@@ -776,8 +994,16 @@
         
         if(tbody.innerHTML === "") {
             let pIdx = 0;
-            tbody.innerHTML = `<tr><td colspan='7' style='text-align:center; padding:20px; color:#aaa;' id='db-load-text'>${dbTablePhrases[0]}</td></tr>`;
-            window.dbLoadingInterval = setInterval(() => { const el = document.getElementById('db-load-text'); if(el) { pIdx = (pIdx + 1) % dbTablePhrases.length; el.innerText = dbTablePhrases[pIdx]; } }, 1200);
+            const loadStr = `<tr><td colspan='{COL}' style='text-align:center; padding:25px; color:#aaa; font-family:"JetBrains Mono";' class='db-load-text'>${dbTablePhrases[0]}</td></tr>`;
+            
+            tbody.innerHTML = loadStr.replace('{COL}', '7');
+            if(pbody) pbody.innerHTML = loadStr.replace('{COL}', '6');
+            if(sbody) sbody.innerHTML = loadStr.replace('{COL}', '3');
+            
+            window.dbLoadingInterval = setInterval(() => { 
+                pIdx = (pIdx + 1) % dbTablePhrases.length; 
+                document.querySelectorAll('.db-load-text').forEach(el => el.innerText = dbTablePhrases[pIdx]); 
+            }, 1200);
         }
         
         try {
@@ -787,40 +1013,88 @@
             masterData = JSON.parse(text);
             const encSession = sessionStorage.getItem('mgc_secure'); const session = sysCrypt.unlock(encSession);
             const isDev = String(session.role).toLowerCase().includes('developer');
+            const isAdmin = String(session.role).toLowerCase().includes('admin');
+            const dbAcc = session.dbAccess || "";
+            
+            const canUsers = isDev || isAdmin || dbAcc.includes('Users');
+            const canPages = isDev || isAdmin || dbAcc.includes('Pages');
+            const canSec = isDev || isAdmin || dbAcc.includes('Security');
+            const canSet = isDev || dbAcc.includes('Settings');
+            
             let displayUsers = masterData.users;
             if(!isDev) displayUsers = masterData.users.filter(u => !String(u.role).toLowerCase().includes('developer'));
             displayUsers.sort((a, b) => (a.status === 'Online' ? -1 : 1));
 
             document.getElementById('active-count').innerText = `Active Users: ${masterData.active.length}`;
             
-            tbody.innerHTML = displayUsers.map(u => {
-                const isOnline = u.status === 'Online';
-                const statusHtml = isOnline ? `<span class="status-dot dot-online"></span><span style="color:var(--green)">Online</span>` : `<span class="status-dot dot-offline"></span><span style="color:#777">Offline</span>`;
-                const targetIsDev = String(u.role).toLowerCase().includes('developer');
-                const canKick = (isDev || (!isDev && !targetIsDev)) && isOnline;
-                const logoutBtn = canKick ? `<button class="btn-small btn-red" onclick="forceDisconnect('${u.username}', this)">Logout</button>` : `<span style="color:#555;">-</span>`;
+            if (canUsers) {
+                tbody.innerHTML = displayUsers.map(u => {
+                    const isOnline = u.status === 'Online';
+                    const statusHtml = isOnline ? `<span class="status-dot dot-online"></span><span style="color:var(--green)">Online</span>` : `<span class="status-dot dot-offline"></span><span style="color:#777">Offline</span>`;
+                    const targetIsDev = String(u.role).toLowerCase().includes('developer');
+                    const targetIsAdmin = String(u.role).toLowerCase().includes('admin');
+                    const canKick = (isDev || (!isDev && !targetIsDev)) && isOnline;
+                    
+                    const logoutBtn = canKick ? `<button class="btn-small btn-red" onclick="forceDisconnect('${u.username}', this)" style="margin-right:5px;">Logout</button>` : ``;
 
-                // BIOMETRIC TOGGLE RENDER
-                const bioDisabled = u.bioStatus === 'Disabled';
-                const bioBtnClass = bioDisabled ? 'btn-red' : 'btn-green';
-                const bioText = bioDisabled ? 'Bio: OFF' : 'Bio: ON';
-                const bioBtnHtml = `<button class="btn-small ${bioBtnClass}" onclick="toggleBioAccess('${u.username}')" style="margin-right: 5px;">${bioText}</button>`;
+                    let bioBtnHtml = "";
+                    if(u.hasBio) {
+                        const bioDisabled = u.bioStatus === 'Disabled';
+                        const bioBtnClass = bioDisabled ? 'btn-red' : 'btn-green';
+                        const bioText = bioDisabled ? 'Passkey: OFF' : 'Passkey: ON';
+                        bioBtnHtml = `<button class="btn-small ${bioBtnClass}" onclick="togglePasskeyAccess('${u.username}', this)" style="margin-right: 5px;">${bioText}</button>`;
+                    } else {
+                        bioBtnHtml = `<span style="color:#555; font-size:9px; margin-right:5px;">No Passkey</span>`;
+                    }
 
-                return `<tr>
-                    <td><input type="checkbox" class="user-select" value="${u.username}"></td>
-                    <td><span class="badge-id">${u.id}</span></td>
-                    <td><b style="color:#fff;">${u.username}</b></td>
-                    <td style="color:#888;">${u.role}</td>
-                    <td style="white-space: nowrap;">${statusHtml}</td>
-                    <td>${logoutBtn}</td>
-                    <td style="text-align: right; white-space: nowrap;">
-                        ${bioBtnHtml}
-                        <button class="btn-small" onclick="showEditUser('${u.id}')">Edit</button>
-                    </td>
-                </tr>`;
-            }).join('');
+                    const uAccStr = u.dbAccess || "";
+                    let accessHtml = `<span style="color:#555; font-size:9px;">Unavailable</span>`;
+                    
+                    if (targetIsDev) {
+                        accessHtml = `<span style="color:#555; font-size:9px;">Unavailable</span>`;
+                    } else if (targetIsAdmin) {
+                        if (isDev) {
+                            accessHtml = `
+                            <div style="display:flex; gap:4px; align-items:center;">
+                                <span style="color:var(--blue); font-size:9px; margin-right:4px;">Admin</span>
+                                <button class="btn-small ${uAccStr.includes('Settings') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Settings', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Set</button>
+                            </div>`;
+                        } else {
+                            accessHtml = `<span style="color:var(--blue); font-size:9px;">Admin Default</span>`;
+                        }
+                    } else if (isDev || isAdmin) {
+                        const setToggleHtml = isDev ? `<button class="btn-small ${uAccStr.includes('Settings') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Settings', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Set</button>` : '';
 
-            if(isDev) {
+                        accessHtml = `
+                        <div style="display:flex; gap:4px; align-items:center;">
+                            <button class="btn-small ${uAccStr.includes('Users') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Users', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Usr</button>
+                            <button class="btn-small ${uAccStr.includes('Pages') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Pages', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Pg</button>
+                            <button class="btn-small ${uAccStr.includes('Security') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Security', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Sec</button>
+                            ${setToggleHtml}
+                        </div>`;
+                    } else {
+                        accessHtml = `<span style="color:#555; font-size:9px;">Restricted</span>`;
+                    }
+
+                    return `<tr>
+                        <td><input type="checkbox" class="user-select" value="${u.username}"></td>
+                        <td><span class="badge-id">${u.id}</span></td>
+                        <td><b style="color:#fff;">${u.username}</b></td>
+                        <td style="color:#888;">${u.role}</td>
+                        <td style="white-space: nowrap;">${statusHtml}</td>
+                        <td>${accessHtml}</td>
+                        <td style="text-align: right; white-space: nowrap;">
+                            ${bioBtnHtml}
+                            ${logoutBtn}
+                            <button class="btn-small" onclick="showEditUser('${u.id}', '')">Edit</button>
+                        </td>
+                    </tr>`;
+                }).join('');
+            } else {
+                tbody.innerHTML = `<tr><td colspan='7' style='text-align:center; padding:20px; color:#555;'>Permission Denied</td></tr>`;
+            }
+
+            if(canPages) {
                 if(masterData.pages) {
                     pbody.innerHTML = masterData.pages.map(p => {
                         const pVis = p.status !== 'Hidden';
@@ -835,15 +1109,28 @@
                         </tr>`;
                     }).join('');
                 }
-                
+            } else {
+                pbody.innerHTML = `<tr><td colspan='6' style='text-align:center; padding:20px; color:#555;'>Permission Denied</td></tr>`;
+            }
+            
+            if(canSec) {
                 let secHtml = "";
                 for(let i=0; i<masterData.keyCount; i++) { secHtml += `<tr><td>Key #${i+1}</td><td style="color:var(--green);">[ ENCRYPTED HASH ]</td><td style="text-align:right;"><button class="btn-small btn-red" onclick="revokeKey(${i+2})">Revoke</button></td></tr>`; }
-                if(sbody) sbody.innerHTML = secHtml;
-
-                const btn = document.getElementById('maint-btn');
-                btn.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF";
-                btn.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
+                sbody.innerHTML = secHtml;
+            } else {
+                sbody.innerHTML = `<tr><td colspan='3' style='text-align:center; padding:20px; color:#555;'>Permission Denied</td></tr>`;
             }
+
+            if(canSet) {
+                const maintBtn = document.getElementById('maint-btn');
+                maintBtn.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF";
+                maintBtn.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
+
+                const passkeyBtn = document.getElementById('global-passkey-btn');
+                passkeyBtn.innerText = masterData.passkeyLogin ? "Passkey Login: ON" : "Passkey Login: OFF";
+                passkeyBtn.className = masterData.passkeyLogin ? "btn-maint-off" : "btn-maint-on"; 
+            }
+
             if(document.getElementById('logs-modal').style.display === 'flex') renderLogs();
         } catch(e) { clearInterval(window.dbLoadingInterval); if(tbody.innerHTML.includes("Loading")) tbody.innerHTML = "<tr><td colspan='7' class='error-msg' style='text-align:center; padding:20px;'>Database Error.</td></tr>"; }
     }
@@ -856,7 +1143,7 @@
         if(!confirm(`Force logout ${selected.length} users?`)) return;
 
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        selected.forEach(uname => { const indBtn = document.querySelector(`button[onclick="forceDisconnect('${uname}', this)"]`); if(indBtn) { indBtn.innerText = "Logging Out..."; indBtn.style.opacity = "0.5"; } });
+        selected.forEach(uname => { const indBtn = document.querySelector(`button[onclick="forceDisconnect('${uname}', this)"]`); if(indBtn) { indBtn.innerText = "Processing..."; indBtn.style.opacity = "0.5"; indBtn.disabled = true; } });
 
         fetch(API, postConfig({ action: "bulk_logout", targets: selected, operatorId: session.id, operatorName: session.name, operatorRole: session.role })).then(() => {
             document.querySelectorAll('.user-select').forEach(cb => cb.checked = false); refreshDB();
@@ -885,16 +1172,41 @@
         } catch(e) { btn.innerText = "Delete Selected"; }
     }
 
-    async function toggleMaintenance() {
-        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure')); const btn = document.getElementById('maint-btn');
-        masterData.maintenance = !masterData.maintenance; btn.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF"; btn.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
-        fetch(API, postConfig({ action: "toggle_maintenance", state: masterData.maintenance, operatorId: session.id, operatorName: session.name })).then(() => refreshDB()); 
+    async function toggleMaintenance(btnElement) {
+        const isOff = btnElement.innerText.includes('OFF');
+        masterData.maintenance = isOff; 
+        btnElement.innerText = masterData.maintenance ? "Maintenance: ON" : "Maintenance: OFF";
+        btnElement.className = masterData.maintenance ? "btn-maint-on" : "btn-maint-off";
+        btnElement.style.pointerEvents = 'none'; 
+        btnElement.style.opacity = '0.5';
+
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        await fetch(API, postConfig({ action: "toggle_maintenance", state: masterData.maintenance, operatorId: session.id, operatorName: session.name }));
+        
+        btnElement.style.pointerEvents = 'auto';
+        btnElement.style.opacity = '1';
+    }
+
+    async function toggleGlobalPasskey(btnElement) {
+        const isOff = btnElement.innerText.includes('OFF');
+        masterData.passkeyLogin = isOff; 
+        btnElement.innerText = masterData.passkeyLogin ? "Passkey Login: ON" : "Passkey Login: OFF";
+        btnElement.className = masterData.passkeyLogin ? "btn-maint-off" : "btn-maint-on";
+        btnElement.style.pointerEvents = 'none'; 
+        btnElement.style.opacity = '0.5';
+
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        await fetch(API, postConfig({ action: "toggle_passkey", state: masterData.passkeyLogin, operatorId: session.id, operatorName: session.name }));
+        
+        btnElement.style.pointerEvents = 'auto';
+        btnElement.style.opacity = '1';
     }
 
     async function forceDisconnect(target, btnElement) {
-        if(btnElement) { btnElement.innerText = "Logging Out..."; btnElement.style.opacity = "0.5"; }
+        if(btnElement) { btnElement.innerText = "Processing..."; btnElement.style.opacity = "0.5"; btnElement.disabled = true; }
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        fetch(API, postConfig({ action: "force_logout", targetUser: target, operatorId: session.id, operatorName: session.name, operatorRole: session.role })).then(() => refreshDB());
+        await fetch(API, postConfig({ action: "force_logout", targetUser: target, operatorId: session.id, operatorName: session.name, operatorRole: session.role }));
+        refreshDB();
     }
 
     async function addSecurityKey() {
@@ -910,9 +1222,6 @@
         await fetch(API, postConfig({ action: "revoke_key", rowIndex: rowIndex, operatorId: session.id, operatorName: session.name, operatorRole: session.role }));
         refreshDB();
     }
-
-    function openLogsModal() { document.getElementById('db-modal').style.display = 'none'; document.getElementById('logs-modal').style.display = 'flex'; renderLogs(); }
-    function backToDBFromLogs() { document.getElementById('logs-modal').style.display = 'none'; document.getElementById('db-modal').style.display = 'flex'; }
 
     function renderLogs() {
         if(!masterData || !masterData.logs) return;
@@ -934,33 +1243,71 @@
         else { indicator.innerText = "✔ Available"; indicator.style.color = "var(--green)"; saveBtn.disabled = false; }
     }
 
-    function showEditUser(userId, forceRole = null) {
-        document.getElementById('db-modal').style.display = 'none'; document.getElementById('edit-modal').style.display = 'flex';
-        setUIState('commit-btn', false, "Save Changes"); setUIState('del-btn', false, "Delete User"); document.getElementById('user-availability').innerText = "";
+    function showEditUser(userId, forceRole = '') {
+        document.getElementById('db-modal').style.display = 'none'; 
+        document.getElementById('edit-modal').style.display = 'flex';
+        setUIState('commit-btn', false, "Save Changes"); 
+        setUIState('del-btn', false, "Delete User"); 
+        document.getElementById('user-availability').innerText = "";
         document.getElementById('pwd-rules-edit').innerHTML = "";
+        document.getElementById('edit-status').innerText = "";
         
-        ['edit-p', 'edit-a', 'sec-key'].forEach(id => { const el = document.getElementById(id); if(el) { el.type = "password"; const eye = el.nextElementSibling; if(eye) { eye.classList.remove('eye-open'); eye.classList.add('eye-closed'); } } });
-        document.getElementById('sec-key').value = ""; clearInterval(liveRadarTimer); 
+        ['edit-p', 'edit-a', 'sec-key'].forEach(id => { const el = document.getElementById(id); if(el) { el.type = "password"; el.value = ""; const eye = el.nextElementSibling; if(eye) { eye.classList.remove('eye-open'); eye.classList.add('eye-closed'); } } });
+        clearInterval(liveRadarTimer); 
 
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        const isDev = String(session.role).toLowerCase().includes('developer'); const isAdmin = String(session.role).toLowerCase().includes('admin');
+        const isDev = String(session.role).toLowerCase().includes('developer'); 
+        const isAdmin = String(session.role).toLowerCase().includes('admin');
 
         let u = null; if(userId) u = masterData.users.find(x => x.id === userId);
 
-        const isTargetAdmin = u && String(u.role).toLowerCase().includes('admin'); const isCreatingAdmin = (forceRole === 'Admin');
-        const showAuthBox = isDev || (isAdmin && (isTargetAdmin || isCreatingAdmin)); document.getElementById('auth-col-box').style.display = showAuthBox ? "block" : "none";
+        const isTargetAdmin = u && String(u.role).toLowerCase().includes('admin'); 
+        const isTargetDev = u && String(u.role).toLowerCase().includes('developer');
+        const isCreatingAdmin = (forceRole === 'Admin');
+        const effectivelyAdmin = isTargetAdmin || isCreatingAdmin;
+
+        const showAuthBox = isDev || (isAdmin && (isTargetAdmin || isCreatingAdmin)); 
+        document.getElementById('auth-col-box').style.display = showAuthBox ? "block" : "none";
+        
+        document.querySelectorAll('.db-perm-cb').forEach(cb => cb.checked = false);
+
+        if (isTargetDev) {
+            document.getElementById('db-access-zone').style.display = "none";
+        } else {
+            document.getElementById('db-access-zone').style.display = (isDev || isAdmin) ? "block" : "none";
+            document.querySelectorAll('.db-perm-label').forEach(lbl => {
+                const cb = lbl.querySelector('.db-perm-cb');
+                if (cb.value !== 'Settings') {
+                    lbl.style.display = effectivelyAdmin ? 'none' : 'inline-block';
+                } else {
+                    lbl.style.display = isDev ? 'inline-block' : 'none';
+                }
+            });
+        }
 
         if(userId && u) {
+            document.getElementById('custom-id-box').style.display = "none";
             document.getElementById('edit-title').innerText = "Edit User: " + u.username;
             document.getElementById('edit-u').value = u.username; document.getElementById('edit-u').dataset.original = u.username; 
-            document.getElementById('edit-p').value = ""; document.getElementById('edit-r').value = u.role; document.getElementById('edit-r').readOnly = false;
-            document.getElementById('edit-n').value = u.name; document.getElementById('edit-a').value = ""; document.getElementById('delete-zone').style.display = "block";
+            document.getElementById('edit-r').value = u.role; document.getElementById('edit-r').readOnly = false;
+            document.getElementById('edit-n').value = u.name;
+            document.getElementById('delete-zone').style.display = "block";
+            
+            if(u.dbAccess) {
+                u.dbAccess.split(',').forEach(perm => {
+                    const cb = document.querySelector(`.db-perm-cb[value="${perm.trim()}"]`);
+                    if(cb) cb.checked = true;
+                });
+            }
         } else {
+            document.getElementById('custom-id-box').style.display = "block";
+            document.getElementById('edit-custom-id').value = "";
             document.getElementById('edit-title').innerText = forceRole === "Admin" ? "Add New Admin" : "Add New User";
-            document.getElementById('edit-u').value = ""; document.getElementById('edit-u').dataset.original = "NEW"; document.getElementById('edit-p').value = ""; 
+            document.getElementById('edit-u').value = ""; document.getElementById('edit-u').dataset.original = "NEW"; 
             document.getElementById('edit-r').value = forceRole ? forceRole : ""; document.getElementById('edit-r').readOnly = forceRole ? true : false;
-            document.getElementById('edit-n').value = ""; document.getElementById('edit-a').value = ""; document.getElementById('delete-zone').style.display = "none";
-            setUIState('commit-btn', true, "Save Changes"); // Require valid pass to unblock
+            document.getElementById('edit-n').value = ""; 
+            document.getElementById('delete-zone').style.display = "none";
+            setUIState('commit-btn', true, "Save Changes"); 
         }
         document.getElementById('edit-u').focus();
     }
@@ -968,18 +1315,39 @@
     async function saveUser() {
         if(!confirm("Are you sure you want to save this user?")) return;
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        const originalUser = document.getElementById('edit-u').dataset.original; const newUsername = document.getElementById('edit-u').value.trim();
+        const isDev = String(session.role).toLowerCase().includes('developer');
+        const isAdmin = String(session.role).toLowerCase().includes('admin');
+        
+        const originalUser = document.getElementById('edit-u').dataset.original; 
+        const newUsername = document.getElementById('edit-u').value.trim();
         if(!newUsername) return;
         
         setUIState('commit-btn', true, "Saving...");
         const payload = { action: originalUser === "NEW" ? "add" : "update", operatorId: session.id, operatorName: session.name, targetUser: originalUser === "NEW" ? null : originalUser, username: newUsername, password: document.getElementById('edit-p').value, role: document.getElementById('edit-r').value, name: document.getElementById('edit-n').value };
         
+        if (originalUser === "NEW") {
+            payload.customId = document.getElementById('edit-custom-id').value.trim();
+        }
+
         const authBoxVisible = document.getElementById('auth-col-box').style.display !== 'none';
         if (authBoxVisible) payload.auth = document.getElementById('edit-a').value;
+
+        if (isDev || isAdmin) {
+            let selectedPerms = Array.from(document.querySelectorAll('.db-perm-cb:checked')).map(cb => cb.value);
+            
+            if (isAdmin && !isDev) {
+                const existingUser = masterData ? masterData.users.find(u => u.username === originalUser) : null;
+                if (existingUser && existingUser.dbAccess && existingUser.dbAccess.includes('Settings')) {
+                    selectedPerms.push('Settings');
+                }
+            }
+            payload.dbAccess = selectedPerms.join(',');
+        }
 
         try {
             const res = await fetch(API, postConfig(payload)); const text = await res.text();
             if (text === "409") { setUIState('commit-btn', false, "Save Changes", true); document.getElementById('user-availability').innerText = "✖ Unavailable"; document.getElementById('user-availability').style.color = "var(--red)"; } 
+            else if (text === "409_ID") { setUIState('commit-btn', false, "Save Changes", true); alert("Custom User ID already exists in the system."); } 
             else { setUIState('commit-btn', true, "Success!"); setTimeout(() => { clearInterval(liveRadarTimer); document.getElementById('edit-modal').style.display = 'none'; document.getElementById('db-modal').style.display = 'flex'; refreshDB(); liveRadarTimer = setInterval(refreshDB, 5000); }, 300); }
         } catch(e) { setUIState('commit-btn', false, "Save Changes", true); }
     }
@@ -999,24 +1367,53 @@
         } catch(e) { setUIState('del-btn', false, "Delete User"); }
     }
 
+    function togglePageAllAccess(allCheckbox) {
+        const cbs = document.querySelectorAll('.page-access-cb:not([value="ALL"])');
+        cbs.forEach(cb => {
+            cb.disabled = allCheckbox.checked;
+            if(allCheckbox.checked) cb.checked = false;
+        });
+    }
+
     function showEditPage(encoded) {
         clearInterval(liveRadarTimer); document.getElementById('db-modal').style.display = 'none'; document.getElementById('page-modal').style.display = 'flex'; setUIState('commit-page-btn', false, "Save Page");
+        
+        let currentAllowed = "ALL";
         if(encoded) {
-            const p = JSON.parse(decodeURIComponent(atob(encoded))); document.getElementById('page-title').innerText = "Edit Page: " + p.id;
+            const p = JSON.parse(decodeURIComponent(atob(encoded))); 
+            document.getElementById('page-title').innerText = "Edit Page: " + p.id;
             document.getElementById('page-t').value = p.title; document.getElementById('page-u').value = p.url;
-            document.getElementById('page-a').value = p.allowed; document.getElementById('page-s').value = p.status || "Visible"; document.getElementById('page-t').dataset.id = p.id;
+            document.getElementById('page-s').value = p.status || "Visible"; document.getElementById('page-t').dataset.id = p.id;
+            currentAllowed = p.allowed;
         } else {
             document.getElementById('page-title').innerText = "Add New Page"; document.getElementById('page-t').value = ""; document.getElementById('page-u').value = "";
-            document.getElementById('page-a').value = "ALL"; document.getElementById('page-s').value = "Visible"; document.getElementById('page-t').dataset.id = "NEW";
+            document.getElementById('page-s').value = "Visible"; document.getElementById('page-t').dataset.id = "NEW";
         }
+
+        const accessContainer = document.getElementById('page-access-container');
+        let cbHtml = `<label style="font-size:10px; color:#ccc; display:block; margin-bottom:8px; cursor:pointer;"><input type="checkbox" value="ALL" onchange="togglePageAllAccess(this)" class="page-access-cb" ${currentAllowed.includes('ALL') ? 'checked' : ''}> <b style="color:var(--gold);">[ ALL USERS ]</b></label>`;
+        
+        if(masterData && masterData.users) {
+            masterData.users.forEach(u => {
+                const isChecked = currentAllowed.includes(u.id) && !currentAllowed.includes('ALL');
+                const isDisabled = currentAllowed.includes('ALL') ? 'disabled' : '';
+                cbHtml += `<label style="font-size:10px; color:#ccc; display:block; margin-bottom:4px; cursor:pointer;"><input type="checkbox" value="${u.id}" class="page-access-cb" ${isChecked ? 'checked' : ''} ${isDisabled}> ${u.username} <span style="color:#555;">(${u.id})</span></label>`;
+            });
+        }
+        accessContainer.innerHTML = cbHtml;
     }
 
     async function savePage() {
         if(!confirm("Are you sure you want to save this page?")) return;
         const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure')); const pId = document.getElementById('page-t').dataset.id;
         setUIState('commit-page-btn', true, "Saving...");
+        
+        let allowedArray = Array.from(document.querySelectorAll('.page-access-cb:checked:not([disabled])')).map(cb => cb.value);
+        if (document.querySelector('.page-access-cb[value="ALL"]').checked) allowedArray = ["ALL"];
+        const allowedStr = allowedArray.join(',');
+
         try {
-            await fetch(API, postConfig({ action: "save_page", operatorId: session.id, operatorName: session.name, pageId: pId, title: document.getElementById('page-t').value, url: document.getElementById('page-u').value, allowed: document.getElementById('page-a').value, status: document.getElementById('page-s').value }));
+            await fetch(API, postConfig({ action: "save_page", operatorId: session.id, operatorName: session.name, pageId: pId, title: document.getElementById('page-t').value, url: document.getElementById('page-u').value, allowed: allowedStr, status: document.getElementById('page-s').value }));
             clearInterval(liveRadarTimer); document.getElementById('page-modal').style.display = 'none'; document.getElementById('db-modal').style.display = 'flex'; refreshDB(); liveRadarTimer = setInterval(refreshDB, 5000);
         } catch(e) { setUIState('commit-page-btn', false, "Save Page", true); }
     }
@@ -1027,13 +1424,10 @@
         await fetch(API, postConfig({ action: "delete_page", operatorId: session.id, operatorName: session.name, pageId: id })); refreshDB();
     }
 
-    function closeModals() { clearInterval(liveRadarTimer); clearInterval(window.dbLoadingInterval); document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
-    function backToDB() { clearInterval(liveRadarTimer); clearInterval(window.dbLoadingInterval); document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); document.getElementById('db-modal').style.display = 'flex'; refreshDB(); liveRadarTimer = setInterval(refreshDB, 5000); }
-
     const canvas = document.getElementById('matrix-bg'); const ctx = canvas.getContext('2d'); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const drops = Array(Math.floor(canvas.width/20)).fill(1);
     setInterval(() => {
-        ctx.fillStyle = "rgba(5, 10, 20, 0.15)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "#0073e6"; ctx.font = "15px monospace";
+        ctx.fillStyle = "rgba(5, 10, 20, 0.2)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "#00e5ff"; ctx.font = "15px monospace";
         drops.forEach((y, i) => { ctx.fillText(Math.floor(Math.random()*2), i*20, y*20); if(y*20 > canvas.height && Math.random() > 0.98) drops[i] = 0; drops[i]++; });
     }, 50);
 </script>
