@@ -1,5 +1,5 @@
 /**
- * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + BIOMETRICS + ADMIN CONTROLS)
+ * mgcryan v0.0.0.1 - SERVER LOGIC (SPEED OPTIMIZED + UNIVERSAL PASSKEY + ELITE DB ACCESS)
  */
 
 function sha256(str) {
@@ -20,13 +20,14 @@ function setupSheet(ss, name, headers) {
 
 function ensureUserColumns(sheet) {
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID", "BioStatus"]);
+    sheet.appendRow(["ID", "Username", "Password", "Role", "Name", "Auth", "Status", "BiometricID", "BioStatus", "DB_Access"]);
     return;
   }
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   if (String(headers[0]).trim().toUpperCase() !== "ID") sheet.insertColumnBefore(1);
   if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") { sheet.getRange(1, 8).setValue("BiometricID"); }
   if (sheet.getLastColumn() < 9 || headers[8] !== "BioStatus") { sheet.getRange(1, 9).setValue("BioStatus"); }
+  if (sheet.getLastColumn() < 10 || headers[9] !== "DB_Access") { sheet.getRange(1, 10).setValue("DB_Access"); }
 }
 
 function getNextId(sheet, prefix) {
@@ -43,15 +44,22 @@ function getNextId(sheet, prefix) {
 }
 
 function getSetting(sheet, key) {
+  if (sheet.getLastRow() === 0) return "false";
   const data = sheet.getDataRange().getValues();
-  for (let r of data) { if (r[0] === key) return String(r[1]); }
+  for (let r of data) { 
+    if (String(r[0]).trim() === key) return String(r[1]).trim(); 
+  }
   return "false";
 }
 
 function updateSetting(sheet, key, value) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(["Key", "Value"]);
+    sheet.getRange(1, 1, 1, 2).setFontWeight("bold").setBackground("#d9d9d9");
+  }
   const data = sheet.getDataRange().getValues();
   for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === key) {
+    if (String(data[i][0]).trim() === key) {
       sheet.getRange(i + 1, 2).setValue(value);
       return;
     }
@@ -79,8 +87,8 @@ function doPost(e) {
 
     if (data.action === "setup_system") {
       if (userSheet.getLastRow() > 1) return ContentService.createTextOutput("403");
-      const newId = "MGC-0001";
-      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled"]);
+      const newId = data.devId ? data.devId.trim() : "MGC-0001";
+      userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled", "Users,Pages,Security,Settings"]);
       if(secSheet.getLastRow() === 0) secSheet.appendRow(["Encrypted_Security_Keys"]);
       secSheet.appendRow([sha256(data.securityKey)]);
       logSheet.appendRow([dateStr, timeStr, newId, data.username, "System", "Initialized Root Developer Account"]);
@@ -92,62 +100,90 @@ function doPost(e) {
       return ContentService.createTextOutput("200");
     }
 
-    // TOGGLE BIOMETRICS (ADMIN CONTROL)
+    if (data.action === "update_inline_access") {
+      const rows = userSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
+          userSheet.getRange(i + 1, 10).setValue(data.dbAccess);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} modified granular access`]);
+          return ContentService.createTextOutput("200");
+        }
+      }
+      return ContentService.createTextOutput("404");
+    }
+
     if (data.action === "toggle_bio") {
       const rows = userSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
           const currentStatus = String(rows[i][8]).trim() === "Disabled" ? "Enabled" : "Disabled";
           userSheet.getRange(i + 1, 9).setValue(currentStatus);
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} set Biometric login to ${currentStatus}`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} set Passkey login to ${currentStatus}`]);
           return ContentService.createTextOutput("200");
         }
       }
       return ContentService.createTextOutput("404");
     }
 
-    // WEB AUTH BIOMETRIC REGISTRATION
+    if (data.action === "toggle_passkey") {
+      updateSetting(settingsSheet, "PASSKEY_LOGIN", data.state);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Enabled Global Passkey Login" : "Disabled Global Passkey Login"]);
+      return ContentService.createTextOutput("200");
+    }
+
     if (data.action === "register_bio") {
       const rows = userSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.username).trim()) {
           userSheet.getRange(i + 1, 8).setValue(data.bioId);
-          userSheet.getRange(i + 1, 9).setValue("Enabled"); // Auto enable on fresh registration
-          logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Security", "Registered Biometric Passkey"]);
+          userSheet.getRange(i + 1, 9).setValue("Enabled"); 
+          logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Security", "Registered Passkey"]);
           return ContentService.createTextOutput("200");
         }
       }
       return ContentService.createTextOutput("404");
     }
 
-    // WEB AUTH BIOMETRIC LOGIN (Usernameless + Speed Optimized)
+    if (data.action === "verify_auth_bio") {
+      const rows = userSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][1]).trim() === String(data.username).trim()) {
+          if (String(rows[i][7]).trim() === String(data.bioId).trim() && String(rows[i][8]).trim() !== "Disabled") {
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management via Passkey"]);
+            return ContentService.createTextOutput("200");
+          } else {
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Failed Database Auth Attempt (Passkey)"]);
+            return ContentService.createTextOutput("403");
+          }
+        }
+      }
+      return ContentService.createTextOutput("404");
+    }
+
     if (data.action === "login_bio") {
       const rows = userSheet.getDataRange().getValues();
       const isMaint = getSetting(settingsSheet, "MAINTENANCE") === "true";
+      const passkeyLogin = getSetting(settingsSheet, "PASSKEY_LOGIN") !== "false"; 
+      
       for (let i = 1; i < rows.length; i++) {
         const storedBio = String(rows[i][7]).trim();
         if (storedBio !== "" && storedBio === data.bioId) {
           
+          const role = String(rows[i][3]).trim();
+          if (!passkeyLogin && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("403_PASSKEY_LOGIN");
+
           const bioStatus = String(rows[i][8]).trim();
           if (bioStatus === "Disabled") return ContentService.createTextOutput("403_BIO");
 
           const matchedUsername = String(rows[i][1]).trim();
-          const role = String(rows[i][3]).trim();
           const userId = String(rows[i][0]).trim();
           
           if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
           
-          if (sessionSheet.getLastRow() > 1) {
-            const sessions = sessionSheet.getDataRange().getValues();
-            for(let s = sessions.length - 1; s >= 1; s--) {
-              if(String(sessions[s][1]).trim() === matchedUsername) sessionSheet.deleteRow(s + 1);
-            }
-          }
-          
           const sessionToken = Utilities.getUuid();
           userSheet.getRange(i + 1, 7).setValue("Online");
           sessionSheet.appendRow([userId, matchedUsername, role, dateStr, timeStr, sessionToken]);
-          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Biometrics"]);
+          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Passkey"]);
           
           let allowedPages = [];
           if (pageSheet.getLastRow() > 1) {
@@ -161,7 +197,7 @@ function doPost(e) {
 
           return ContentService.createTextOutput(JSON.stringify({
             status: "200", token: sessionToken,
-            user: { id: userId, username: matchedUsername, role: rows[i][3], name: rows[i][4] },
+            user: { id: userId, username: matchedUsername, role: rows[i][3], name: rows[i][4], dbAccess: rows[i][9] || '', hasBio: true, bioStatus: bioStatus },
             links: allowedPages,
             bioEnabled: true
           }));
@@ -184,13 +220,6 @@ function doPost(e) {
           
           if (isMaint && !role.toLowerCase().includes("developer")) return ContentService.createTextOutput("503");
           
-          if (sessionSheet.getLastRow() > 1) {
-            const sessions = sessionSheet.getDataRange().getValues();
-            for(let s = sessions.length - 1; s >= 1; s--) {
-              if(String(sessions[s][1]).trim() === String(data.username).trim()) sessionSheet.deleteRow(s + 1);
-            }
-          }
-          
           const sessionToken = Utilities.getUuid();
           userSheet.getRange(i + 1, 7).setValue("Online");
           sessionSheet.appendRow([userId, rows[i][1], role, dateStr, timeStr, sessionToken]);
@@ -208,7 +237,7 @@ function doPost(e) {
 
           return ContentService.createTextOutput(JSON.stringify({
             status: "200", token: sessionToken,
-            user: { id: userId, username: rows[i][1], role: rows[i][3], name: rows[i][4] },
+            user: { id: userId, username: rows[i][1], role: rows[i][3], name: rows[i][4], dbAccess: rows[i][9] || '', hasBio: hasBio, bioStatus: bioStatus },
             links: allowedPages,
             bioEnabled: hasBio,
             bioStatus: bioStatus
@@ -251,26 +280,37 @@ function doPost(e) {
 
     if (data.action === "logout" || data.action === "force_logout") {
       const target = data.targetUser || data.username;
-      const uRows = userSheet.getDataRange().getValues();
-      for(let i = 1; i < uRows.length; i++) {
-        if(String(uRows[i][1]).trim() === String(target).trim()) {
-           userSheet.getRange(i + 1, 7).setValue("Offline");
-           break;
-        }
-      }
-
+      
       if (sessionSheet.getLastRow() > 1) {
         const sessions = sessionSheet.getDataRange().getValues();
         for(let i = sessions.length - 1; i >= 1; i--) {
-          if(String(sessions[i][1]).trim() === String(target).trim()) {
+          if (data.action === "logout" && String(sessions[i][5]).trim() === String(data.token).trim()) {
             sessionSheet.deleteRow(i + 1);
-            if (data.action === "force_logout") {
-              logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, target, `${data.operatorName} forcefully logged out user ${target}`]);
-            } else {
-              logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Self", "Logged out of Web App"]);
-            }
-            return ContentService.createTextOutput("200");
+            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Self", "Logged out of Web App (Device specific)"]);
+            break; 
+          } else if (data.action === "force_logout" && String(sessions[i][1]).trim() === String(target).trim()) {
+            sessionSheet.deleteRow(i + 1);
           }
+        }
+      }
+
+      if (data.action === "force_logout") {
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, target, `${data.operatorName} forcefully logged out user ${target}`]);
+      }
+
+      let stillOnline = false;
+      if (sessionSheet.getLastRow() > 1) {
+         const remSessions = sessionSheet.getDataRange().getValues();
+         for(let i = 1; i < remSessions.length; i++) {
+            if(String(remSessions[i][1]).trim() === String(target).trim()) { stillOnline = true; break; }
+         }
+      }
+
+      const uRows = userSheet.getDataRange().getValues();
+      for(let i = 1; i < uRows.length; i++) {
+        if(String(uRows[i][1]).trim() === String(target).trim()) {
+           userSheet.getRange(i + 1, 7).setValue(stillOnline ? "Online" : "Offline");
+           break;
         }
       }
       return ContentService.createTextOutput("200");
@@ -278,16 +318,16 @@ function doPost(e) {
 
     if (data.action === "bulk_logout") {
       const targets = data.targets;
-      const uRows = userSheet.getDataRange().getValues();
-      for(let t of targets) {
-        for(let i = 1; i < uRows.length; i++) {
-          if(String(uRows[i][1]).trim() === String(t).trim()) { userSheet.getRange(i + 1, 7).setValue("Offline"); break; }
-        }
-      }
       if (sessionSheet.getLastRow() > 1) {
         const sessions = sessionSheet.getDataRange().getValues();
         for(let s = sessions.length - 1; s >= 1; s--) {
           if(targets.includes(String(sessions[s][1]).trim())) { sessionSheet.deleteRow(s + 1); }
+        }
+      }
+      const uRows = userSheet.getDataRange().getValues();
+      for(let t of targets) {
+        for(let i = 1; i < uRows.length; i++) {
+          if(String(uRows[i][1]).trim() === String(t).trim()) { userSheet.getRange(i + 1, 7).setValue("Offline"); break; }
         }
       }
       logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Multiple Users", `${data.operatorName} mass logged out ${targets.length} users`]);
@@ -346,15 +386,29 @@ function doPost(e) {
           if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
             let finalPass = data.password ? sha256(data.password) : rows[i][2]; 
             let finalAuth = data.auth ? sha256(data.auth) : rows[i][5];
+            
             userSheet.getRange(i + 1, 2, 1, 5).setValues([[data.username, finalPass, data.role, data.name, finalAuth]]);
+            if (data.dbAccess !== undefined) {
+               userSheet.getRange(i + 1, 10).setValue(data.dbAccess);
+            }
+            
             logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} updated user details for ${data.username}`]);
             return ContentService.createTextOutput("200");
           }
         }
       } else {
-        const newId = getNextId(userSheet, "MGC");
-        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled"]);
-        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} added new user ${data.username}`]);
+        // ID Generation Logic (Custom vs Auto)
+        let newId = "";
+        if (data.customId && data.customId !== "") {
+            const idExists = rows.some(r => String(r[0]).trim().toUpperCase() === String(data.customId).trim().toUpperCase());
+            if (idExists) return ContentService.createTextOutput("409_ID");
+            newId = data.customId.trim();
+        } else {
+            newId = getNextId(userSheet, "MGC");
+        }
+
+        userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled", data.dbAccess || ""]);
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} added new user ${data.username} (${newId})`]);
         return ContentService.createTextOutput("200");
       }
     }
@@ -417,6 +471,7 @@ function doGet(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = ss.getSheetByName("Settings");
     const maint = settingsSheet ? getSetting(settingsSheet, "MAINTENANCE") === "true" : false;
+    const passkeyLogin = settingsSheet ? getSetting(settingsSheet, "PASSKEY_LOGIN") !== "false" : true;
     const userSheet = ss.getSheetByName("Users");
     
     if (e.parameter && e.parameter.mode === "status") {
@@ -427,7 +482,7 @@ function doGet(e) {
         const uData = userSheet.getDataRange().getValues().slice(1);
         devs = uData.filter(r => String(r[3]).toLowerCase().includes('developer')).map(r => String(r[1]).toLowerCase());
       }
-      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, devs: devs, isSetup: isSetup })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ maintenance: maint, passkeyLogin: passkeyLogin, devs: devs, isSetup: isSetup })).setMimeType(ContentService.MimeType.JSON);
     }
 
     if (!userSheet) return ContentService.createTextOutput("ERROR: 'Users' sheet missing.");
@@ -452,8 +507,8 @@ function doGet(e) {
 
     const users = userSheet.getDataRange().getValues().slice(1).map(r => {
       const isOnline = activeUsernames.includes(String(r[1]).trim());
-      // Append BioStatus mapped from 9th column
-      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled' };
+      const hasBioData = String(r[7]).trim() !== "";
+      return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled', dbAccess: r[9] || '', hasBio: hasBioData };
     });
     const logs = logSheet && logSheet.getLastRow() > 1 ? logSheet.getDataRange().getValues().slice(1).reverse() : [];
     const pages = pageSheet && pageSheet.getLastRow() > 1 ?
@@ -463,7 +518,7 @@ function doGet(e) {
     const keyCount = secSheet ? Math.max(0, secSheet.getLastRow() - 1) : 0;
     
     return ContentService.createTextOutput(JSON.stringify({
-      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, keyCount: keyCount
+      users, logs, pages, active: activeUsers, validTokens: validTokens, maintenance: maint, passkeyLogin: passkeyLogin, keyCount: keyCount
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch(err) {
