@@ -46,7 +46,7 @@
         .f-link:hover { background: rgba(0,115,230,0.15); padding-left: 18px; text-shadow: 0 0 8px var(--blue); }
 
         .tab-bar { display: flex; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 15px; flex-wrap: wrap; }
-        .db-tab { padding: 10px 20px; font-size: 11px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; font-weight: bold; text-transform: uppercase; }
+        .db-tab { padding: 10px 20px; font-size: 11px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; font-weight: bold; text-transform: uppercase; position: relative; }
         .db-tab:hover { color: #fff; }
         .tab-active { color: var(--blue); border-bottom-color: var(--blue); }
         .tab-content { display: none; flex-direction: column; flex-grow: 1; overflow: hidden; }
@@ -108,10 +108,12 @@
                     <input type="text" id="user" placeholder="Username" class="enter-tab" data-next="pass" onkeyup="checkMaintenancePreflight()">
                     <div id="inline-maint-warning">SYSTEM UNDER MAINTENANCE</div>
                 </div>
-                <div class="pass-wrapper">
+                <div class="pass-wrapper" style="margin-bottom:5px;">
                     <input type="password" id="pass" placeholder="Password" class="enter-tab" data-next="login-btn">
                     <span class="cyber-eye eye-closed" onclick="togglePass('pass', this)"></span>
                 </div>
+                <div id="forgot-link" style="display:none; text-align:right; font-size:10px; color:var(--blue); cursor:pointer; margin-bottom:10px;" onclick="openForgotModal()">Forgot Password?</div>
+                
                 <button id="login-btn" onclick="login()">Login</button>
                 <button id="bio-btn" onclick="loginBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 5px;">🧬 Passkey Login</button>
                 <div id="login-status" class="status-msg"></div>
@@ -161,6 +163,52 @@
         </div>
     </div>
 
+    <div class="modal" id="force-pass-modal">
+        <div class="glass-panel" style="width: 320px; text-align: center;">
+            <h4 style="margin-top:0; color: var(--red);">Mandatory Security Update</h4>
+            <p style="font-size:10px; color:#aaa; margin-bottom:15px;">An Administrator requires you to update your password before proceeding.</p>
+            <div class="pass-wrapper" style="margin-bottom:5px;">
+                <input type="password" id="force-p" placeholder="New Password" class="enter-tab" data-next="force-pass-btn" onkeyup="checkPwdStrength('force-p', 'force-pass-btn', 'pwd-rules-force', false)">
+                <span class="cyber-eye eye-closed" onclick="togglePass('force-p', this)"></span>
+            </div>
+            <div id="pwd-rules-force" class="pwd-rules" style="margin-bottom:10px;"></div>
+            <button id="force-pass-btn" onclick="executeForceReset('Password')" disabled>Update Password</button>
+            <div id="force-pass-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="force-auth-modal">
+        <div class="glass-panel" style="width: 320px; text-align: center;">
+            <h4 style="margin-top:0; color: var(--red);">Mandatory Auth Update</h4>
+            <p style="font-size:10px; color:#aaa; margin-bottom:15px;">An Administrator requires you to update your DB Auth Code before proceeding.</p>
+            <div class="pass-wrapper" style="margin-bottom:5px;">
+                <input type="password" id="force-a" placeholder="New Auth Code" class="enter-tab" data-next="force-auth-btn">
+                <span class="cyber-eye eye-closed" onclick="togglePass('force-a', this)"></span>
+            </div>
+            <button id="force-auth-btn" onclick="executeForceReset('AuthCode')">Update Auth Code</button>
+            <button onclick="closeModals()" style="background:transparent; color: #aaa; margin-top:5px;">Cancel</button>
+            <div id="force-auth-status" class="status-msg"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="forgot-modal">
+        <div class="glass-panel" style="width: 320px; text-align: center;">
+            <h4 style="margin-top:0; color: #fff;">Request Password Reset</h4>
+            <p style="font-size:10px; color:#aaa; margin-bottom:15px;">Enter your username and new password. An Administrator must approve this request.</p>
+            <div class="input-group">
+                <input type="text" id="forgot-u" placeholder="Username" class="enter-tab" data-next="forgot-p">
+            </div>
+            <div class="pass-wrapper" style="margin-bottom:5px;">
+                <input type="password" id="forgot-p" placeholder="New Password" class="enter-tab" data-next="req-reset-btn" onkeyup="checkPwdStrength('forgot-p', 'req-reset-btn', 'pwd-rules-forgot', false)">
+                <span class="cyber-eye eye-closed" onclick="togglePass('forgot-p', this)"></span>
+            </div>
+            <div id="pwd-rules-forgot" class="pwd-rules" style="margin-bottom:10px;"></div>
+            <button id="req-reset-btn" onclick="submitResetRequest('Password')" disabled>Submit Request</button>
+            <button onclick="closeModals()" style="background:transparent; color: #aaa; margin-top:5px;">Cancel</button>
+            <div id="forgot-status" class="status-msg"></div>
+        </div>
+    </div>
+
     <div class="modal" id="db-auth-modal">
         <div class="glass-panel" style="width: 320px; text-align: center;">
             <h4 id="db-auth-title" style="margin-top:0; color: #fff;">Authorization Required</h4>
@@ -199,6 +247,7 @@
                 <div class="db-tab tab-active" id="users-tab-btn" onclick="switchTab('users')" style="display:none;">Users</div>
                 <div class="db-tab" id="page-tab-btn" onclick="switchTab('pages')" style="display:none;">Pages</div>
                 <div class="db-tab" id="sec-tab-btn" onclick="switchTab('security')" style="display:none;">Security Keys</div>
+                <div class="db-tab" id="approvals-tab-btn" onclick="switchTab('approvals')" style="display:none;">Approvals <span id="app-badge"></span></div>
             </div>
             
             <div id="tab-users" class="tab-content content-active">
@@ -267,6 +316,25 @@
                             </tr>
                         </thead>
                         <tbody id="sec-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-approvals" class="tab-content">
+                <div class="db-action-bar">
+                    <span style="color:#aaa; font-size:10px;">Pending Security Requests</span>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">User</th>
+                                <th style="width: 20%;">Request Type</th>
+                                <th style="width: 25%;">Date</th>
+                                <th style="width: 30%; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="app-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -360,10 +428,19 @@
                     <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Users"> Manage Users</label>
                     <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Pages"> Manage Pages</label>
                     <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Security"> Manage Security</label>
+                    <label class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Approvals"> Manage Approvals</label>
                     <label id="lbl-perm-settings" class="db-perm-label" style="font-size:10px; color:#ccc; cursor:pointer;"><input type="checkbox" class="db-perm-cb" value="Settings"> Manage Settings</label>
                 </div>
             </div>
             
+            <div id="force-reset-zone" style="display:none; border-top: 1px solid rgba(255,255,255,0.1); padding-top:15px; margin-top:15px;">
+                <label style="font-size:10px; color:var(--gold);">Force Security Updates (Bypass Approvals)</label>
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                    <button id="btn-force-pass" class="btn-small btn-gold" onclick="setForceReset('Password', this)">Require Password Change</button>
+                    <button id="btn-force-auth" class="btn-small btn-gold" onclick="setForceReset('AuthCode', this)">Require Auth Change</button>
+                </div>
+            </div>
+
             <button id="commit-btn" onclick="saveUser()" style="margin-top:15px;">Save Changes</button>
             
             <div id="delete-zone" style="display:none; border-top: 1px solid rgba(255,0,85,0.3); padding-top:15px; margin-top:15px;">
@@ -419,6 +496,7 @@
     let loginLockoutTimer = null;
     let loadingInterval = null;
     let tempBioUsername = "";
+    let tempForceResetUser = "";
 
     const sysCrypt = {
         lock: (data) => btoa(unescape(encodeURIComponent(JSON.stringify(data)))),
@@ -462,6 +540,7 @@
         if(tabId === 'users') { document.getElementById('users-tab-btn').classList.add('tab-active'); document.getElementById('tab-users').classList.add('content-active'); } 
         else if (tabId === 'pages') { document.getElementById('page-tab-btn').classList.add('tab-active'); document.getElementById('tab-pages').classList.add('content-active'); } 
         else if (tabId === 'security') { document.getElementById('sec-tab-btn').classList.add('tab-active'); document.getElementById('tab-security').classList.add('content-active'); }
+        else if (tabId === 'approvals') { document.getElementById('approvals-tab-btn').classList.add('tab-active'); document.getElementById('tab-approvals').classList.add('content-active'); }
     }
     
     const setUIState = (id, disabled, text, isError = false) => {
@@ -477,17 +556,24 @@
         else { input.type = "password"; iconElement.classList.remove("eye-open"); iconElement.classList.add("eye-closed"); }
     }
 
-    document.querySelectorAll('.enter-tab').forEach(input => {
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const nextId = this.getAttribute('data-next');
-                if (nextId) { const nextEl = document.getElementById(nextId); if (nextEl && !nextEl.disabled) { nextEl.focus(); if (nextEl.tagName === 'BUTTON') nextEl.click(); } }
-            }
+    function initEnterTabs() {
+        document.querySelectorAll('.enter-tab').forEach(input => {
+            input.removeEventListener('keydown', handleEnter); 
+            input.addEventListener('keydown', handleEnter);
         });
-    });
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const nextId = this.getAttribute('data-next');
+            if (nextId) { const nextEl = document.getElementById(nextId); if (nextEl && !nextEl.disabled) { nextEl.focus(); if (nextEl.tagName === 'BUTTON') nextEl.click(); } }
+        }
+    }
 
     window.onload = () => {
+        initEnterTabs();
+        checkLockout();
         fetch(API + "?mode=status").then(r => r.json()).then(d => {
             if (d.isSetup) {
                 document.getElementById('login-container').style.display = 'none';
@@ -529,11 +615,14 @@
         const canUsers = isDev || isAdmin || dbAcc.includes('Users');
         const canPages = isDev || isAdmin || dbAcc.includes('Pages');
         const canSec = isDev || isAdmin || dbAcc.includes('Security');
+        const canApp = isDev || isAdmin || dbAcc.includes('Approvals');
         const canSet = isDev || dbAcc.includes('Settings');
 
         document.getElementById('users-tab-btn').style.display = canUsers ? "block" : "none";
         document.getElementById('page-tab-btn').style.display = canPages ? "block" : "none";
         document.getElementById('sec-tab-btn').style.display = canSec ? "block" : "none";
+        document.getElementById('approvals-tab-btn').style.display = canApp ? "block" : "none"; 
+        
         document.getElementById('settings-btn').style.display = canSet ? "inline-block" : "none";
         document.getElementById('logs-btn').style.display = isDev ? "inline-block" : "none"; 
         document.getElementById('btn-add-admin').style.display = isDev ? "inline-block" : "none"; 
@@ -541,6 +630,7 @@
         if (canUsers) switchTab('users');
         else if (canPages) switchTab('pages');
         else if (canSec) switchTab('security');
+        else if (canApp) switchTab('approvals');
         else if (canSet) {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('content-active'));
             openSettings();
@@ -582,26 +672,46 @@
         } else { warnEl.style.display = 'none'; }
     }
 
+    function checkLockout() {
+        const lockoutEnd = localStorage.getItem('mgc_lockout_time');
+        if (lockoutEnd) {
+            const timeLeft = Math.ceil((parseInt(lockoutEnd) - Date.now()) / 1000);
+            if (timeLeft > 0) {
+                resumeLockoutTimer(timeLeft);
+            } else {
+                localStorage.removeItem('mgc_lockout_time');
+            }
+        }
+    }
+
     function triggerLockout() {
         let timeLeft = 30;
+        localStorage.setItem('mgc_lockout_time', Date.now() + 30000);
+        resumeLockoutTimer(timeLeft);
+    }
+
+    function resumeLockoutTimer(timeLeft) {
         setUIState('login-btn', true, `Locked (${timeLeft}s)`, true);
         document.getElementById('login-status').innerText = "Too many failed attempts.";
-        
+        if(loginLockoutTimer) clearInterval(loginLockoutTimer);
         loginLockoutTimer = setInterval(() => {
             timeLeft--;
             if(timeLeft <= 0) {
                 clearInterval(loginLockoutTimer);
                 loginFailAttempts = 0;
+                localStorage.removeItem('mgc_lockout_time');
                 setUIState('login-btn', false, "Login");
                 document.getElementById('login-status').innerText = "";
-            } else { setUIState('login-btn', true, `Locked (${timeLeft}s)`, true); }
+            } else { 
+                setUIState('login-btn', true, `Locked (${timeLeft}s)`, true); 
+            }
         }, 1000);
     }
 
     const loginPhrases = ["Routing through proxies...", "Bypassing firewalls...", "Validating encryption...", "Almost there..."];
 
     async function login() {
-        if(loginFailAttempts >= 3) return;
+        if(localStorage.getItem('mgc_lockout_time') && parseInt(localStorage.getItem('mgc_lockout_time')) > Date.now()) return;
         const u = document.getElementById('user').value.trim();
         const p = document.getElementById('pass').value.trim();
         if(!u || !p) return;
@@ -623,10 +733,24 @@
             if (text === "503") { 
                 document.getElementById('login-container').style.display = "none";
                 document.getElementById('massive-maint-block').style.display = "block";
-            } else if (text === "404" || text === "401") { 
+            } else if (text === "404_USER") {
                 loginFailAttempts++;
+                if (loginFailAttempts >= 1) document.getElementById('forgot-link').style.display = 'block';
                 if(loginFailAttempts >= 3) { triggerLockout(); } 
-                else { setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = `Invalid Credentials. ${3 - loginFailAttempts} attempts left.`; }
+                else { setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = `Username invalid/not registered. ${3 - loginFailAttempts} attempts left.`; }
+            } else if (text === "401_PASS") { 
+                loginFailAttempts++;
+                if (loginFailAttempts >= 1) document.getElementById('forgot-link').style.display = 'block';
+                if(loginFailAttempts >= 3) { triggerLockout(); } 
+                else { setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = `Incorrect password. ${3 - loginFailAttempts} attempts left.`; }
+            } else if (text.startsWith('{"status":"FORCE_PASS"')) {
+                const d = JSON.parse(text);
+                tempForceResetUser = d.username;
+                document.getElementById('force-p').value = "";
+                document.getElementById('force-pass-status').innerText = "";
+                document.getElementById('force-pass-btn').disabled = true;
+                document.getElementById('force-pass-modal').style.display = 'flex';
+                setUIState('login-btn', false, "Login");
             } else if (text.includes("200")) {
                 setUIState('login-btn', false, "Login Granted!");
                 const data = JSON.parse(text);
@@ -644,6 +768,80 @@
                 }
             } else { setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = "Server Error."; }
         } catch(e) { clearInterval(loadingInterval); setUIState('login-btn', false, "Login", true); document.getElementById('login-status').innerText = "Network Offline."; }
+    }
+
+    function openForgotModal() {
+        document.getElementById('forgot-modal').style.display = 'flex';
+        document.getElementById('forgot-u').value = "";
+        document.getElementById('forgot-p').value = "";
+        document.getElementById('forgot-status').innerText = "";
+        document.getElementById('req-reset-btn').disabled = true;
+    }
+
+    async function submitResetRequest(type) {
+        let u, p;
+        if (type === 'Password') {
+            u = document.getElementById('forgot-u').value.trim();
+            p = document.getElementById('forgot-p').value.trim();
+        } else {
+            const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+            u = session.username;
+            p = document.getElementById('db-auth-input').value.trim();
+        }
+
+        if (!u || !p) return;
+        const btnId = type === 'Password' ? 'req-reset-btn' : 'decrypt-btn';
+        const statusId = type === 'Password' ? 'forgot-status' : 'decrypt-status';
+        
+        setUIState(btnId, true, "Sending Request...");
+        try {
+            const res = await fetch(API, postConfig({action: "request_reset", type: type === 'Password' ? 'Password' : 'AuthCode', username: u, newPassword: p}));
+            const text = await res.text();
+            if(text === "200") {
+                document.getElementById(statusId).innerHTML = "<span style='color:var(--green);'>✔ Request submitted. Awaiting Admin approval. Please check back later.</span>";
+                setTimeout(() => { closeModals(); }, 4000);
+            } else {
+                setUIState(btnId, false, type === 'Password' ? "Submit Request" : "Submit Setup Request", true);
+                document.getElementById(statusId).innerText = "Error submitting request.";
+            }
+        } catch(e) {
+            setUIState(btnId, false, type === 'Password' ? "Submit Request" : "Submit Setup Request", true);
+            document.getElementById(statusId).innerText = "Network Error.";
+        }
+    }
+
+    async function executeForceReset(type) {
+       const u = (type === 'Password') ? tempForceResetUser : sysCrypt.unlock(sessionStorage.getItem('mgc_secure')).username;
+       const p = (type === 'Password') ? document.getElementById('force-p').value : document.getElementById('force-a').value;
+       if (!p) return;
+       
+       const btnId = type === 'Password' ? 'force-pass-btn' : 'force-auth-btn';
+       const statId = type === 'Password' ? 'force-pass-status' : 'force-auth-status';
+       
+       setUIState(btnId, true, "Updating...");
+       try {
+           const res = await fetch(API, postConfig({ action: "execute_force_reset", type: type, username: u, newHash: p }));
+           const text = await res.text();
+           if (text === "200") {
+               document.getElementById(statId).innerHTML = "<span style='color:var(--green)'>✔ Successfully Updated!</span>";
+               setTimeout(() => {
+                   if (type === 'Password') {
+                       closeModals();
+                       alert("Password updated successfully. Please log in with your new password.");
+                       window.location.reload();
+                   } else {
+                       closeModals();
+                       openDBAuth(); 
+                   }
+               }, 1500);
+           } else {
+               setUIState(btnId, false, "Update " + (type === 'Password' ? "Password" : "Auth Code"), true);
+               document.getElementById(statId).innerText = "Update Failed.";
+           }
+       } catch(e) {
+           setUIState(btnId, false, "Update " + (type === 'Password' ? "Password" : "Auth Code"), true);
+           document.getElementById(statId).innerText = "Network Error.";
+       }
     }
 
     async function enrollBiometrics(btnElement) {
@@ -706,11 +904,19 @@
                 setUIState('bio-btn', false, "🧬 Passkey Login"); 
                 document.getElementById('login-status').innerText = "Passkey Disabled.";
                 alert("SECURITY ALERT:\n\nPasskey login has been disabled for your account by the Administrator. Please use your standard password.");
-            } else if (text === "401" || text.startsWith("ERROR:")) { 
+            } else if (text === "401" || text === "401_PASS" || text.startsWith("ERROR:")) { 
                 setUIState('bio-btn', false, "🧬 Passkey Login"); document.getElementById('login-status').innerText = "Passkey Verification Failed."; 
             } else if (text === "503") {
                 document.getElementById('login-container').style.display = "none";
                 document.getElementById('massive-maint-block').style.display = "block";
+            } else if (text.startsWith('{"status":"FORCE_PASS"')) {
+                const d = JSON.parse(text);
+                tempForceResetUser = d.username;
+                document.getElementById('force-p').value = "";
+                document.getElementById('force-pass-status').innerText = "";
+                document.getElementById('force-pass-btn').disabled = true;
+                document.getElementById('force-pass-modal').style.display = 'flex';
+                setUIState('bio-btn', false, "🧬 Passkey Login");
             } else if (text.includes("200")) {
                 const data = JSON.parse(text);
                 sessionStorage.setItem('mgc_secure', sysCrypt.lock(data.user));
@@ -808,7 +1014,7 @@
 
         const role = String(user.role).toLowerCase();
         const dbAcc = user.dbAccess || "";
-        const hasAnyAccess = role.includes('developer') || role.includes('admin') || dbAcc.includes('Users') || dbAcc.includes('Pages') || dbAcc.includes('Security') || dbAcc.includes('Settings');
+        const hasAnyAccess = role.includes('developer') || role.includes('admin') || dbAcc.includes('Users') || dbAcc.includes('Pages') || dbAcc.includes('Security') || dbAcc.includes('Settings') || dbAcc.includes('Approvals');
         
         if(hasAnyAccess) { 
             document.getElementById('db-btn').style.display = "inline-block"; 
@@ -912,6 +1118,24 @@
             
             if (text.startsWith("ERROR:")) { setUIState('decrypt-btn', false, "Verify", true); document.getElementById('decrypt-status').innerText = text; return; }
 
+            if (text === "403_SETUP_REQUIRED") {
+                setUIState('decrypt-btn', false, "Submit Setup Request");
+                document.getElementById('db-auth-title').innerText = "Setup DB Auth Code";
+                document.getElementById('decrypt-status').innerHTML = "<span style='color:var(--gold);'>Auth code not set. Enter a new code to request approval.</span>";
+                document.getElementById('decrypt-btn').setAttribute('onclick', "submitResetRequest('AuthCode')");
+                document.getElementById('db-bio-btn').style.display = 'none';
+                return;
+            }
+
+            if (text === "FORCE_AUTH") {
+                setUIState('decrypt-btn', false, "Verify");
+                closeModals();
+                document.getElementById('force-a').value = "";
+                document.getElementById('force-auth-status').innerText = "";
+                document.getElementById('force-auth-modal').style.display = 'flex';
+                return;
+            }
+
             if (text === "200") {
                 setUIState('decrypt-btn', false, "Verify");
                 sessionStorage.setItem('mgc_view', 'db'); 
@@ -941,6 +1165,16 @@
 
             const res = await fetch(API, postConfig({ action: "verify_auth_bio", username: session.username, bioId: bioId }));
             const text = await res.text();
+
+            if (text === "FORCE_AUTH") {
+                dbBioBtn.disabled = false;
+                dbBioBtn.innerText = "🧬 Passkey Auth";
+                closeModals();
+                document.getElementById('force-a').value = "";
+                document.getElementById('force-auth-status').innerText = "";
+                document.getElementById('force-auth-modal').style.display = 'flex';
+                return;
+            }
 
             if (text === "200") {
                 dbBioBtn.disabled = false;
@@ -990,7 +1224,7 @@
 
     async function refreshDB() {
         if(document.querySelectorAll('.user-select:checked').length > 0) return;
-        const tbody = document.getElementById('user-body'); const pbody = document.getElementById('page-body'); const sbody = document.getElementById('sec-body');
+        const tbody = document.getElementById('user-body'); const pbody = document.getElementById('page-body'); const sbody = document.getElementById('sec-body'); const abody = document.getElementById('app-body');
         
         if(tbody.innerHTML === "") {
             let pIdx = 0;
@@ -999,6 +1233,7 @@
             tbody.innerHTML = loadStr.replace('{COL}', '7');
             if(pbody) pbody.innerHTML = loadStr.replace('{COL}', '6');
             if(sbody) sbody.innerHTML = loadStr.replace('{COL}', '3');
+            if(abody) abody.innerHTML = loadStr.replace('{COL}', '4');
             
             window.dbLoadingInterval = setInterval(() => { 
                 pIdx = (pIdx + 1) % dbTablePhrases.length; 
@@ -1019,6 +1254,7 @@
             const canUsers = isDev || isAdmin || dbAcc.includes('Users');
             const canPages = isDev || isAdmin || dbAcc.includes('Pages');
             const canSec = isDev || isAdmin || dbAcc.includes('Security');
+            const canApp = isDev || isAdmin || dbAcc.includes('Approvals');
             const canSet = isDev || dbAcc.includes('Settings');
             
             let displayUsers = masterData.users;
@@ -1064,12 +1300,14 @@
                         }
                     } else if (isDev || isAdmin) {
                         const setToggleHtml = isDev ? `<button class="btn-small ${uAccStr.includes('Settings') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Settings', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Set</button>` : '';
+                        const appToggleHtml = isDev || isAdmin ? `<button class="btn-small ${uAccStr.includes('Approvals') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Approvals', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">App</button>` : '';
 
                         accessHtml = `
                         <div style="display:flex; gap:4px; align-items:center;">
                             <button class="btn-small ${uAccStr.includes('Users') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Users', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Usr</button>
                             <button class="btn-small ${uAccStr.includes('Pages') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Pages', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Pg</button>
                             <button class="btn-small ${uAccStr.includes('Security') ? 'btn-green' : 'btn-maint-off'}" onclick="toggleInlinePerm('${u.username}', 'Security', this)" style="padding:4px 6px; font-size:9px; width:auto; margin:0;">Sec</button>
+                            ${appToggleHtml}
                             ${setToggleHtml}
                         </div>`;
                     } else {
@@ -1090,6 +1328,28 @@
                         </td>
                     </tr>`;
                 }).join('');
+
+                if (canApp) {
+                    if (masterData.approvals && masterData.approvals.length > 0) {
+                        abody.innerHTML = masterData.approvals.map(req => `
+                            <tr>
+                                <td><b style="color:#fff;">${req.username}</b></td>
+                                <td style="color:var(--gold);">${req.type} Setup</td>
+                                <td style="color:#888; font-size:9px;">${req.date}</td>
+                                <td style="text-align: right; white-space: nowrap;">
+                                    <button class="btn-small btn-green" onclick="resolveReq('${req.id}', 'Approve', this)" style="margin-right:5px;">Approve</button>
+                                    <button class="btn-small btn-red" onclick="resolveReq('${req.id}', 'Reject', this)">Reject</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                        document.getElementById('app-badge').innerText = `(${masterData.approvals.length})`;
+                        document.getElementById('app-badge').style.color = "var(--red)";
+                    } else {
+                        abody.innerHTML = `<tr><td colspan='4' style='text-align:center; padding:20px; color:#555;'>No pending requests</td></tr>`;
+                        document.getElementById('app-badge').innerText = "";
+                    }
+                }
+
             } else {
                 tbody.innerHTML = `<tr><td colspan='7' style='text-align:center; padding:20px; color:#555;'>Permission Denied</td></tr>`;
             }
@@ -1133,6 +1393,31 @@
 
             if(document.getElementById('logs-modal').style.display === 'flex') renderLogs();
         } catch(e) { clearInterval(window.dbLoadingInterval); if(tbody.innerHTML.includes("Loading")) tbody.innerHTML = "<tr><td colspan='7' class='error-msg' style='text-align:center; padding:20px;'>Database Error.</td></tr>"; }
+    }
+
+    async function resolveReq(reqId, decision, btnElement) {
+        btnElement.innerText = "Processing...";
+        btnElement.style.pointerEvents = 'none';
+        btnElement.style.opacity = '0.5';
+        
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        await fetch(API, postConfig({ action: "resolve_reset", reqId: reqId, decision: decision, operatorId: session.id, operatorName: session.name }));
+        refreshDB();
+    }
+
+    async function setForceReset(type, btnElement) {
+        if(!confirm(`Force this user to update their ${type} on next login?`)) return;
+        const targetUser = document.getElementById('edit-u').dataset.original;
+        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
+        
+        btnElement.innerText = "Flagging...";
+        btnElement.disabled = true;
+        btnElement.style.opacity = '0.5';
+        
+        await fetch(API, postConfig({ action: "set_force_reset", targetUser: targetUser, resetType: type, operatorId: session.id, operatorName: session.name }));
+        
+        btnElement.innerText = type === 'Password' ? "Pass Reset Pending" : "Auth Reset Pending";
+        refreshDB(); 
     }
 
     function toggleAllUsers(source) { let checkboxes = document.querySelectorAll('.user-select'); for(let i=0, n=checkboxes.length;i<n;i++) checkboxes[i].checked = source.checked; }
@@ -1293,6 +1578,26 @@
             document.getElementById('edit-n').value = u.name;
             document.getElementById('delete-zone').style.display = "block";
             
+            document.getElementById('force-reset-zone').style.display = (isDev || isAdmin) && !isTargetDev ? "block" : "none";
+            
+            if (u.forceReset) {
+                document.getElementById('btn-force-pass').innerText = u.forceReset.includes('Password') ? "Pass Reset Pending" : "Require Password Change";
+                document.getElementById('btn-force-pass').disabled = u.forceReset.includes('Password');
+                document.getElementById('btn-force-pass').style.opacity = u.forceReset.includes('Password') ? '0.5' : '1';
+                
+                document.getElementById('btn-force-auth').innerText = u.forceReset.includes('AuthCode') ? "Auth Reset Pending" : "Require Auth Change";
+                document.getElementById('btn-force-auth').disabled = u.forceReset.includes('AuthCode');
+                document.getElementById('btn-force-auth').style.opacity = u.forceReset.includes('AuthCode') ? '0.5' : '1';
+            } else {
+                document.getElementById('btn-force-pass').innerText = "Require Password Change";
+                document.getElementById('btn-force-pass').disabled = false;
+                document.getElementById('btn-force-pass').style.opacity = '1';
+                
+                document.getElementById('btn-force-auth').innerText = "Require Auth Change";
+                document.getElementById('btn-force-auth').disabled = false;
+                document.getElementById('btn-force-auth').style.opacity = '1';
+            }
+
             if(u.dbAccess) {
                 u.dbAccess.split(',').forEach(perm => {
                     const cb = document.querySelector(`.db-perm-cb[value="${perm.trim()}"]`);
@@ -1307,9 +1612,11 @@
             document.getElementById('edit-r').value = forceRole ? forceRole : ""; document.getElementById('edit-r').readOnly = forceRole ? true : false;
             document.getElementById('edit-n').value = ""; 
             document.getElementById('delete-zone').style.display = "none";
+            document.getElementById('force-reset-zone').style.display = "none";
             setUIState('commit-btn', true, "Save Changes"); 
         }
         document.getElementById('edit-u').focus();
+        initEnterTabs(); 
     }
 
     async function saveUser() {
@@ -1401,6 +1708,7 @@
             });
         }
         accessContainer.innerHTML = cbHtml;
+        initEnterTabs();
     }
 
     async function savePage() {
