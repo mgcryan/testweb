@@ -25,14 +25,10 @@ function ensureUserColumns(sheet) {
   }
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   if (String(headers[0]).trim().toUpperCase() !== "ID") sheet.insertColumnBefore(1);
-  if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") { sheet.getRange(1, 8).setValue("BiometricID");
-  }
-  if (sheet.getLastColumn() < 9 || headers[8] !== "BioStatus") { sheet.getRange(1, 9).setValue("BioStatus");
-  }
-  if (sheet.getLastColumn() < 10 || headers[9] !== "DB_Access") { sheet.getRange(1, 10).setValue("DB_Access");
-  }
-  if (sheet.getLastColumn() < 11 || headers[10] !== "ForceReset") { sheet.getRange(1, 11).setValue("ForceReset");
-  }
+  if (sheet.getLastColumn() < 8 || headers[7] !== "BiometricID") { sheet.getRange(1, 8).setValue("BiometricID"); }
+  if (sheet.getLastColumn() < 9 || headers[8] !== "BioStatus") { sheet.getRange(1, 9).setValue("BioStatus"); }
+  if (sheet.getLastColumn() < 10 || headers[9] !== "DB_Access") { sheet.getRange(1, 10).setValue("DB_Access"); }
+  if (sheet.getLastColumn() < 11 || headers[10] !== "ForceReset") { sheet.getRange(1, 11).setValue("ForceReset"); }
 }
 
 function getNextId(sheet, prefix) {
@@ -80,15 +76,22 @@ function doPost(e) {
     const userSheet = ss.getSheetByName("Users");
     ensureUserColumns(userSheet);
     
-    const logSheet = setupSheet(ss, "Logs", ["Date", "Time", "Operator_ID", "Operator_Name", "Target", "Action", "IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]);
+    const logSheet = setupSheet(ss, "Logs", ["Date", "Time", "Operator_ID", "Operator_Username", "Operator_Name", "Target", "Action", "IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]);
     
-    // Hot-patch: Upgrades existing Log sheets to 13 columns instantly without data loss
-    if (logSheet.getLastColumn() < 13) {
-         logSheet.getRange(1, 7, 1, 7).setValues([["IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]]);
-         logSheet.getRange(1, 1, 1, 13).setFontWeight("bold").setBackground("#d9d9d9");
+    // Hot-patch: Upgrades existing Log sheets to 14 columns instantly without data loss
+    if (logSheet.getLastRow() > 0) {
+      const logHeaders = logSheet.getRange(1, 1, 1, logSheet.getLastColumn()).getValues()[0];
+      if (logHeaders[3] !== "Operator_Username") {
+          logSheet.insertColumnBefore(4);
+          logSheet.getRange(1, 4).setValue("Operator_Username");
+      }
+      if (logSheet.getLastColumn() < 14) {
+           logSheet.getRange(1, 8, 1, 7).setValues([["IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]]);
+           logSheet.getRange(1, 1, 1, 14).setFontWeight("bold").setBackground("#d9d9d9");
+      }
     }
 
-    const sessionSheet = setupSheet(ss, "Sessions", ["ID", "Username", "Role", "Date", "Time", "Token"]); 
+    const sessionSheet = setupSheet(ss, "Sessions", ["ID", "Username", "Role", "Date", "Time", "Token"]);
     const settingsSheet = setupSheet(ss, "Settings", ["Key", "Value"]);
     const pageSheet = setupSheet(ss, "Pages", ["Page_ID", "Title", "URL", "Allowed_Users", "Status"]);
     const secSheet = setupSheet(ss, "Security", ["Encrypted_Security_Keys"]);
@@ -104,19 +107,19 @@ function doPost(e) {
       userSheet.appendRow([newId, data.username, sha256(data.password), "Developer", data.name, sha256(data.auth), "Offline", "", "Enabled", "Users,Pages,Security,Settings,Approvals", ""]);
       if(secSheet.getLastRow() === 0) secSheet.appendRow(["Encrypted_Security_Keys"]);
       secSheet.appendRow([sha256(data.securityKey)]);
-      logSheet.appendRow([dateStr, timeStr, newId, data.username, "System", "Initialized Root Developer Account"]);
+      logSheet.appendRow([dateStr, timeStr, newId, data.username, data.name, "System", "Initialized Root Developer Account"]);
       return ContentService.createTextOutput("200");
     }
 
     if (data.action === "log_action") {
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.target, data.details]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.target, data.details]);
       return ContentService.createTextOutput("200");
     }
 
     if (data.action === "request_reset") {
       const reqId = "REQ-" + Utilities.getUuid().substring(0,6).toUpperCase();
       appSheet.appendRow([reqId, data.username, data.type, sha256(data.newPassword), "Pending", dateStr + " " + timeStr]);
-      logSheet.appendRow([dateStr, timeStr, "SYSTEM", "User", data.username, `Requested ${data.type} Reset/Setup`]);
+      logSheet.appendRow([dateStr, timeStr, "SYSTEM", "SYSTEM", "System Auto", "User - " + data.username, `Requested ${data.type} Reset/Setup`]);
       return ContentService.createTextOutput("200");
     }
 
@@ -138,7 +141,7 @@ function doPost(e) {
             }
           }
           appSheet.deleteRow(j + 1);
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, appRows[j][1], `${data.decision}d ${appRows[j][2]} request`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, appRows[j][1], `${data.decision}d ${appRows[j][2]} request`]);
           return ContentService.createTextOutput("200");
         }
       }
@@ -155,7 +158,7 @@ function doPost(e) {
                currentArr.push(data.resetType);
                userSheet.getRange(i + 1, 11).setValue(currentArr.join(','));
            }
-           logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `Mandated ${data.resetType} change`]);
+           logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.targetUser, `Mandated ${data.resetType} change`]);
            return ContentService.createTextOutput("200");
         }
       }
@@ -176,7 +179,7 @@ function doPost(e) {
            current = current.split(',').map(x => x.trim()).filter(x => x && x !== data.type).join(',');
            
            userSheet.getRange(i + 1, 11).setValue(current);
-           logSheet.appendRow([dateStr, timeStr, "SYSTEM", data.username, data.username, `Completed mandatory ${data.type} update`]);
+           logSheet.appendRow([dateStr, timeStr, "SYSTEM", "SYSTEM", "System Auto", data.username, `Completed mandatory ${data.type} update`]);
            return ContentService.createTextOutput("200");
         }
       }
@@ -188,7 +191,7 @@ function doPost(e) {
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
           userSheet.getRange(i + 1, 10).setValue(data.dbAccess);
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} modified granular access`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.targetUser, `${data.operatorName} modified granular access`]);
           return ContentService.createTextOutput("200");
         }
       }
@@ -199,10 +202,9 @@ function doPost(e) {
       const rows = userSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
-          const currentStatus = String(rows[i][8]).trim() === "Disabled" ?
-          "Enabled" : "Disabled";
+          const currentStatus = String(rows[i][8]).trim() === "Disabled" ? "Enabled" : "Disabled";
           userSheet.getRange(i + 1, 9).setValue(currentStatus);
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} set Passkey login to ${currentStatus}`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.targetUser, `${data.operatorName} set Passkey login to ${currentStatus}`]);
           return ContentService.createTextOutput("200");
         }
       }
@@ -211,7 +213,7 @@ function doPost(e) {
 
     if (data.action === "toggle_passkey") {
       updateSetting(settingsSheet, "PASSKEY_LOGIN", data.state);
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Enabled Global Passkey Login" : "Disabled Global Passkey Login"]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "System", data.state ? "Enabled Global Passkey Login" : "Disabled Global Passkey Login"]);
       return ContentService.createTextOutput("200");
     }
 
@@ -221,7 +223,7 @@ function doPost(e) {
         if (String(rows[i][1]).trim() === String(data.username).trim()) {
           userSheet.getRange(i + 1, 8).setValue(data.bioId);
           userSheet.getRange(i + 1, 9).setValue("Enabled"); 
-          logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Security", "Registered Passkey"]);
+          logSheet.appendRow([dateStr, timeStr, rows[i][0], data.username, rows[i][4], "Security", "Registered Passkey"]);
           return ContentService.createTextOutput("200");
         }
       }
@@ -248,10 +250,10 @@ function doPost(e) {
             const browser = devInfo.browser || "-";
             const cpu = devInfo.cpu || "-";
 
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management via Passkey", ip, os, arch, devType, model, browser, cpu]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], rows[i][4], "Database", "Logged into Database Management via Passkey", ip, os, arch, devType, model, browser, cpu]);
             return ContentService.createTextOutput("200");
           } else {
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Failed Database Auth Attempt (Passkey)"]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], rows[i][4], "Database", "Failed Database Auth Attempt (Passkey)"]);
             return ContentService.createTextOutput("403");
           }
         }
@@ -287,7 +289,6 @@ function doPost(e) {
           userSheet.getRange(i + 1, 7).setValue("Online");
           sessionSheet.appendRow([userId, matchedUsername, role, dateStr, timeStr, sessionToken]);
           
-          // Deep Hardware Telemetry
           const devInfo = data.deviceInfo || {};
           const ip = devInfo.ip || "-";
           const os = devInfo.os || "-";
@@ -297,7 +298,7 @@ function doPost(e) {
           const browser = devInfo.browser || "-";
           const cpu = devInfo.cpu || "-";
           
-          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Passkey", ip, os, arch, devType, model, browser, cpu]);
+          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, rows[i][4], "Web App", "Logged into Web App via Passkey", ip, os, arch, devType, model, browser, cpu]);
           
           let allowedPages = [];
           if (pageSheet.getLastRow() > 1) {
@@ -349,7 +350,6 @@ function doPost(e) {
             userSheet.getRange(i + 1, 7).setValue("Online");
             sessionSheet.appendRow([userId, matchedUsername, role, dateStr, timeStr, sessionToken]);
             
-            // Deep Hardware Telemetry
             const devInfo = data.deviceInfo || {};
             const ip = devInfo.ip || "-";
             const os = devInfo.os || "-";
@@ -359,7 +359,7 @@ function doPost(e) {
             const browser = devInfo.browser || "-";
             const cpu = devInfo.cpu || "-";
             
-            logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App", ip, os, arch, devType, model, browser, cpu]);
+            logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, rows[i][4], "Web App", "Logged into Web App", ip, os, arch, devType, model, browser, cpu]);
             
             let allowedPages = [];
             if (pageSheet.getLastRow() > 1) {
@@ -410,10 +410,10 @@ function doPost(e) {
             const browser = devInfo.browser || "-";
             const cpu = devInfo.cpu || "-";
 
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management", ip, os, arch, devType, model, browser, cpu]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], rows[i][4], "Database", "Logged into Database Management", ip, os, arch, devType, model, browser, cpu]);
             return ContentService.createTextOutput("200");
           } else {
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Failed Database Auth Attempt"]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], rows[i][4], "Database", "Failed Database Auth Attempt"]);
             return ContentService.createTextOutput("403");
           }
         }
@@ -431,20 +431,19 @@ function doPost(e) {
           }
         }
       }
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", data.state ? "Turned Maintenance Mode ON" : "Turned Maintenance Mode OFF"]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "System", data.state ? "Turned Maintenance Mode ON" : "Turned Maintenance Mode OFF"]);
       return ContentService.createTextOutput("200");
     }
 
     if (data.action === "logout" || data.action === "force_logout") {
-      const target = data.targetUser ||
-      data.username;
+      const target = data.targetUser || data.username;
       
       if (sessionSheet.getLastRow() > 1) {
         const sessions = sessionSheet.getDataRange().getValues();
         for(let i = sessions.length - 1; i >= 1; i--) {
           if (data.action === "logout" && String(sessions[i][5]).trim() === String(data.token).trim()) {
             sessionSheet.deleteRow(i + 1);
-            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Self", "Logged out of Web App (Device specific)"]);
+            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Self", "Logged out of Web App (Device specific)"]);
             break;
           } else if (data.action === "force_logout" && String(sessions[i][1]).trim() === String(target).trim()) {
             sessionSheet.deleteRow(i + 1);
@@ -453,15 +452,14 @@ function doPost(e) {
       }
 
       if (data.action === "force_logout") {
-        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, target, `${data.operatorName} forcefully logged out user ${target}`]);
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, target, `${data.operatorName} forcefully logged out user ${target}`]);
       }
 
       let stillOnline = false;
       if (sessionSheet.getLastRow() > 1) {
          const remSessions = sessionSheet.getDataRange().getValues();
          for(let i = 1; i < remSessions.length; i++) {
-            if(String(remSessions[i][1]).trim() === String(target).trim()) { stillOnline = true;
-            break; }
+            if(String(remSessions[i][1]).trim() === String(target).trim()) { stillOnline = true; break; }
          }
       }
 
@@ -480,18 +478,16 @@ function doPost(e) {
       if (sessionSheet.getLastRow() > 1) {
         const sessions = sessionSheet.getDataRange().getValues();
         for(let s = sessions.length - 1; s >= 1; s--) {
-          if(targets.includes(String(sessions[s][1]).trim())) { sessionSheet.deleteRow(s + 1);
-          }
+          if(targets.includes(String(sessions[s][1]).trim())) { sessionSheet.deleteRow(s + 1); }
         }
       }
       const uRows = userSheet.getDataRange().getValues();
       for(let t of targets) {
         for(let i = 1; i < uRows.length; i++) {
-          if(String(uRows[i][1]).trim() === String(t).trim()) { userSheet.getRange(i + 1, 7).setValue("Offline");
-          break; }
+          if(String(uRows[i][1]).trim() === String(t).trim()) { userSheet.getRange(i + 1, 7).setValue("Offline"); break; }
         }
       }
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Multiple Users", `${data.operatorName} mass logged out ${targets.length} users`]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Multiple Users", `${data.operatorName} mass logged out ${targets.length} users`]);
       return ContentService.createTextOutput("200");
     }
 
@@ -500,8 +496,7 @@ function doPost(e) {
       const codes = secSheet.getRange(1, 1, Math.max(1, secSheet.getLastRow())).getValues().flat().map(String);
       
       if (codes.includes(hashedCode)) {
-        const targets = data.action === "delete" ?
-        [data.targetUser] : data.targets;
+        const targets = data.action === "delete" ? [data.targetUser] : data.targets;
         let deleted = 0;
 
         for (let t of targets) {
@@ -518,19 +513,18 @@ function doPost(e) {
         if (sessionSheet.getLastRow() > 1) {
           const sessions = sessionSheet.getDataRange().getValues();
           for (let s = sessions.length - 1; s >= 1; s--) {
-            if (targets.includes(String(sessions[s][1]).trim())) { sessionSheet.deleteRow(s + 1);
-            }
+            if (targets.includes(String(sessions[s][1]).trim())) { sessionSheet.deleteRow(s + 1); }
           }
         }
         
         if(data.action === "delete") {
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.targetUser, `${data.operatorName} permanently deleted user ${data.targetUser}`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.targetUser, `${data.operatorName} permanently deleted user ${data.targetUser}`]);
         } else {
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Multiple Users", `${data.operatorName} deleted ${deleted} users`]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Multiple Users", `${data.operatorName} deleted ${deleted} users`]);
         }
         return ContentService.createTextOutput("200");
       }
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "System", "Failed Delete (Invalid Security Key)"]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "System", "Failed Delete (Invalid Security Key)"]);
       return ContentService.createTextOutput("403");
     }
 
@@ -547,15 +541,14 @@ function doPost(e) {
       if (isUpdate) {
         for (let i = 1; i < rows.length; i++) {
           if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
-            let finalPass = data.password ?
-            sha256(data.password) : rows[i][2]; 
+            let finalPass = data.password ? sha256(data.password) : rows[i][2]; 
             let finalAuth = data.auth ? sha256(data.auth) : rows[i][5];
             userSheet.getRange(i + 1, 2, 1, 5).setValues([[data.username, finalPass, data.role, data.name, finalAuth]]);
             if (data.dbAccess !== undefined) {
                userSheet.getRange(i + 1, 10).setValue(data.dbAccess);
             }
             
-            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} updated user details for ${data.username}`]);
+            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.username, `${data.operatorName} updated user details for ${data.username}`]);
             return ContentService.createTextOutput("200");
           }
         }
@@ -570,7 +563,7 @@ function doPost(e) {
         }
 
         userSheet.appendRow([newId, data.username, sha256(data.password), data.role, data.name, sha256(data.auth), "Offline", "", "Enabled", data.dbAccess || "", ""]);
-        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.username, `${data.operatorName} added new user ${data.username} (${newId})`]);
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.username, `${data.operatorName} added new user ${data.username} (${newId})`]);
         return ContentService.createTextOutput("200");
       }
     }
@@ -578,7 +571,7 @@ function doPost(e) {
     if (data.action === "add_key") {
       if (!String(data.operatorRole).toLowerCase().includes("developer")) return ContentService.createTextOutput("403");
       secSheet.appendRow([sha256(data.newKey)]);
-      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Security", "Created a new Master Security Key"]);
+      logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Security", "Created a new Master Security Key"]);
       return ContentService.createTextOutput("200");
     }
     
@@ -587,7 +580,7 @@ function doPost(e) {
       const rowIndex = parseInt(data.rowIndex, 10);
       if(rowIndex && rowIndex <= secSheet.getLastRow()) {
         secSheet.deleteRow(rowIndex);
-        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Security", "Revoked a Master Security Key"]);
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Security", "Revoked a Master Security Key"]);
         return ContentService.createTextOutput("200");
       }
     }
@@ -600,14 +593,14 @@ function doPost(e) {
         for (let i = 1; i < rows.length; i++) {
           if (String(rows[i][0]).trim() === String(data.pageId).trim()) {
             pageSheet.getRange(i + 1, 2, 1, 4).setValues([[data.title, data.url, data.allowed, pStatus]]);
-            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.title, `Updated Page configuration (${pStatus})`]);
+            logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.title, `Updated Page configuration (${pStatus})`]);
             return ContentService.createTextOutput("200");
           }
         }
       } else {
         const newId = getNextId(pageSheet, "PG");
         pageSheet.appendRow([newId, data.title, data.url, data.allowed, pStatus]);
-        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, data.title, `Added New Page Route`]);
+        logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, data.title, `Added New Page Route`]);
         return ContentService.createTextOutput("200");
       }
     }
@@ -617,7 +610,7 @@ function doPost(e) {
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][0]).trim() === String(data.pageId).trim()) {
           pageSheet.deleteRow(i + 1);
-          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorName, "Page", "Deleted Page Route"]);
+          logSheet.appendRow([dateStr, timeStr, data.operatorId, data.operatorUsername || "-", data.operatorName, "Page", "Deleted Page Route"]);
           return ContentService.createTextOutput("200");
         }
       }
@@ -633,9 +626,9 @@ function doGet(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = ss.getSheetByName("Settings");
     const maint = settingsSheet ? getSetting(settingsSheet, "MAINTENANCE") === "true" : false;
-    const passkeyLogin = settingsSheet ?
-    getSetting(settingsSheet, "PASSKEY_LOGIN") !== "false" : true;
+    const passkeyLogin = settingsSheet ? getSetting(settingsSheet, "PASSKEY_LOGIN") !== "false" : true;
     const userSheet = ss.getSheetByName("Users");
+    
     if (e.parameter && e.parameter.mode === "status") {
       let devs = [];
       let isSetup = true;
@@ -653,6 +646,7 @@ function doGet(e) {
     const pageSheet = ss.getSheetByName("Pages");
     const secSheet = ss.getSheetByName("Security");
     const appSheet = setupSheet(ss, "Approvals", ["Req_ID", "Username", "Type", "NewHash", "Status", "Date"]);
+    
     let activeUsernames = [];
     let validTokens = [];
     if (sessionSheet && sessionSheet.getLastRow() > 1) {
@@ -672,6 +666,7 @@ function doGet(e) {
       const hasBioData = String(r[7]).trim() !== "";
       return { id: r[0], username: r[1], role: r[3], name: r[4], status: isOnline ? 'Online' : 'Offline', bioStatus: r[8] || 'Enabled', dbAccess: r[9] || '', forceReset: r[10] || '', hasBio: hasBioData };
     });
+    
     let approvals = [];
     if (appSheet && appSheet.getLastRow() > 1) {
         approvals = appSheet.getDataRange().getValues().slice(1)
@@ -680,13 +675,16 @@ function doGet(e) {
     }
 
     const logs = logSheet && logSheet.getLastRow() > 1 ? logSheet.getDataRange().getValues().slice(1).reverse() : [];
-    const pages = pageSheet && pageSheet.getLastRow() > 1 ?
-      pageSheet.getDataRange().getValues().slice(1).map(r => ({ id: r[0], title: r[1], url: r[2], allowed: r[3], status: r[4] || 'Visible' })) : [];
+    
+    const pages = pageSheet && pageSheet.getLastRow() > 1 ? pageSheet.getDataRange().getValues().slice(1).map(r => ({ id: r[0], title: r[1], url: r[2], allowed: r[3], status: r[4] || 'Visible' })) : [];
+    
     let activeUsers = users.filter(u => u.status === 'Online');
     const keyCount = secSheet ? Math.max(0, secSheet.getLastRow() - 1) : 0;
+    
     return ContentService.createTextOutput(JSON.stringify({
       users, logs, pages, approvals, active: activeUsers, validTokens: validTokens, maintenance: maint, passkeyLogin: passkeyLogin, keyCount: keyCount
     })).setMimeType(ContentService.MimeType.JSON);
+    
   } catch(err) {
     return ContentService.createTextOutput("ERROR: " + err.message);
   }
