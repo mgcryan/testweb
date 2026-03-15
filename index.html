@@ -36,7 +36,7 @@
         .error-msg { color: var(--red); }
         .pwd-rules { font-size: 9px; font-family: 'JetBrains Mono'; margin-top: 4px; min-height: 12px; text-align: left; }
 
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;}
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;}
         .modal-content { background: var(--glass); border: 1px solid rgba(0,115,230,0.2); padding: 25px; width: 100%; max-width: 1200px; max-height: 95vh; display: flex; flex-direction: column; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9); overflow-y: auto;}
         
         .nav-back { color: #aaa; font-size: 12px; cursor: pointer; margin-bottom: 15px; display: inline-block; }
@@ -67,7 +67,7 @@
         .btn-maint-off { background: transparent; border: 1px solid var(--grey); color: #888; }
         .btn-maint-on { background: rgba(255,42,85,0.1); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 15px rgba(255,42,85,0.2); }
 
-        .table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; -webkit-overflow-scrolling: touch; }
+        .table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; -webkit-overflow-scrolling: touch; width: 100%; display: block;}
         .data-table { width: 100%; min-width: 1000px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
         .data-table th { background: rgba(5,10,20,0.95); padding: 12px 10px; color: #888; position: sticky; top: 0; z-index: 2; font-weight: normal; font-size: 10px; text-transform: uppercase; white-space: nowrap;}
         .data-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #ccc; vertical-align: middle; word-wrap: break-word;}
@@ -86,7 +86,11 @@
         .maint-icon { font-size: 50px; margin-bottom: 10px; text-shadow: 0 0 30px var(--red); }
         .maint-title { color: var(--red); font-size: 24px; font-weight: 800; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 3px; }
 
-        /* Responsive Elite Design */
+        /* Responsive Elite Design - Mobile to TV */
+        @media (min-width: 1440px) {
+            .modal-content { max-width: 1400px; }
+        }
+
         @media (max-width: 1024px) {
             .db-action-bar { flex-direction: column; align-items: stretch; gap: 15px;}
             .db-action-bar > div { justify-content: flex-start; }
@@ -94,8 +98,9 @@
         }
 
         @media (max-width: 768px) {
-            .glass-panel { padding: 25px; width: 95%; max-width: 380px; }
-            .modal-content { padding: 15px; width: 100%; height: 100%; border-radius: 0; border: none; }
+            .glass-panel { padding: 25px; width: 95%; max-width: 400px; }
+            .modal { padding: 0; }
+            .modal-content { padding: 15px; width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; border: none; }
             .db-action-bar > div { justify-content: space-between; width: 100%; }
             .btn-small { padding: 10px; font-size: 11px; flex-grow: 1; text-align: center;}
             .nav-back { font-size: 11px; padding: 5px 0; }
@@ -105,12 +110,13 @@
         @media (max-width: 480px) {
             .glass-panel { padding: 20px; }
             h2 { font-size: 14px; }
-            input[type="text"], input[type="password"], select { font-size: 14px; padding: 10px; } /* Prevents iOS Zoom */
+            input[type="text"], input[type="password"], select { font-size: 14px; padding: 10px; }
             button { font-size: 14px; padding: 10px; }
             .f-link { font-size: 11px; padding: 10px; }
             .db-action-bar > span { display: block; text-align: center; margin-bottom: 10px; width: 100%;}
             .db-action-bar > div { flex-direction: column; }
             .btn-small { width: 100%; margin-bottom: 5px; }
+            .data-table { min-width: 900px; }
         }
     </style>
 </head>
@@ -134,7 +140,12 @@
                 <div id="forgot-link" style="display:none; text-align:right; font-size:10px; color:var(--blue); cursor:pointer; margin-bottom:10px;" onclick="openForgotModal()">Forgot Password?</div>
                 
                 <button id="login-btn" onclick="login()">Login</button>
-                <button id="bio-btn" onclick="loginBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 5px;">🧬 Passkey Login</button>
+                
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button id="bio-btn" onclick="loginBiometric('platform')" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); flex: 1; padding: 10px 5px; font-size: 11px;">🧬 Local Passkey</button>
+                    <button id="bio-qr-btn" onclick="loginBiometric('cross-platform')" style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--green); color: var(--green); flex: 1; padding: 10px 5px; font-size: 11px;">📱 QR Passkey</button>
+                </div>
+                
                 <div id="login-status" class="status-msg"></div>
             </div>
 
@@ -236,8 +247,13 @@
                 <span class="cyber-eye eye-closed" onclick="togglePass('db-auth-input', this)"></span>
             </div>
             <button id="decrypt-btn" onclick="verifyDBAuth()">Verify</button>
-            <button id="db-bio-btn" onclick="verifyDBAuthBiometric()" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); margin-top: 10px;">🧬 Passkey Auth</button>
-            <button onclick="closeModals()" style="background:transparent; color: #aaa; margin-top:5px;">Cancel</button>
+            
+            <div id="db-bio-container" style="display:none; gap:5px; margin-top:5px;">
+                <button onclick="verifyDBAuthBiometric('platform')" style="background: rgba(244, 208, 63, 0.1); border: 1px solid var(--gold); color: var(--gold); flex: 1; padding: 10px 5px; font-size: 11px;">🧬 Local Auth</button>
+                <button onclick="verifyDBAuthBiometric('cross-platform')" style="background: rgba(0, 230, 118, 0.1); border: 1px solid var(--green); color: var(--green); flex: 1; padding: 10px 5px; font-size: 11px;">📱 QR Auth</button>
+            </div>
+
+            <button onclick="closeModals()" style="background:transparent; color: #aaa; margin-top:10px;">Cancel</button>
             <div id="decrypt-status" class="status-msg"></div>
         </div>
     </div>
@@ -245,8 +261,9 @@
     <div class="modal" id="bio-setup-modal">
         <div class="glass-panel" style="width: 100%; max-width: 320px; text-align: center;">
             <h3 style="color:var(--gold); margin-top:0;">Secure Your Account</h3>
-            <p style="font-size: 11px; color:#aaa; margin-bottom:20px;">Do you want to enable Passkey login? You can use this device, or scan a QR code with your phone.</p>
-            <button onclick="enrollBiometrics(this)" style="background:var(--gold); color:black;">Yes, Setup Passkey</button>
+            <p style="font-size: 11px; color:#aaa; margin-bottom:20px;">Do you want to enable Passkey login? You can use this device's scanner, or set up your phone via QR code.</p>
+            <button onclick="enrollBiometrics('platform')" style="background:var(--gold); color:black;">Setup Local Passkey</button>
+            <button onclick="enrollBiometrics('cross-platform')" style="background:var(--green); color:black; margin-top:5px;">Setup Phone/QR Passkey</button>
             <button onclick="skipBiometrics()" style="background:transparent; border: 1px solid var(--grey); color: #888; margin-top:10px;">No, Skip</button>
         </div>
     </div>
@@ -536,14 +553,17 @@
         return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
-    // ELITE DEVICE INFO ENGINE
+    // ELITE DEVICE INFO ENGINE W/ ABORT TIMEOUT (FIXED DESKTOP FREEZE)
     async function getDeviceInfo() {
         let ip = "Unknown IP";
         try { 
-            const res = await fetch('https://api.ipify.org?format=json'); 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 Second Timeout max to prevent hanging UI
+            const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal }); 
+            clearTimeout(timeoutId);
             const data = await res.json(); 
             ip = data.ip; 
-        } catch(e) {}
+        } catch(e) { console.warn("IP tracking blocked or timed out."); }
         
         const ua = navigator.userAgent;
         let os = "Unknown", osVersion = "", deviceType = "Desktop", model = "Standard Build", browser = "Unknown";
@@ -942,42 +962,39 @@
        }
     }
 
-    async function enrollBiometrics(btnElement) {
+    // ELITE QR / CROSS-PLATFORM BIOMETRIC ENROLLMENT
+    async function enrollBiometrics(attachmentType = undefined) {
         if (!window.PublicKeyCredential) {
             alert("Security Error: Passkeys are not supported on this browser/device.");
             return;
         }
         
-        const skipBtn = btnElement.nextElementSibling;
-        btnElement.innerText = "Summoning cyber hamsters... 🐹";
-        btnElement.disabled = true;
-        skipBtn.style.display = "none";
-
+        document.getElementById('bio-setup-modal').style.display = 'none';
+        
         try {
             const pubKey = {
                 challenge: crypto.getRandomValues(new Uint8Array(32)),
                 rp: { name: "mgcryan Secure", id: document.location.hostname },
                 user: { id: Uint8Array.from(tempBioUsername, c => c.charCodeAt(0)), name: tempBioUsername, displayName: tempBioUsername },
                 pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                // 'hybrid' triggers Cross-Device QR code capabilities for desktop users without local authenticators
                 authenticatorSelection: { userVerification: "preferred", residentKey: "required", requireResidentKey: true },
-                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
+
+            // Force QR code UI to appear immediately for Cross-Platform requests
+            if (attachmentType === 'cross-platform') {
+                pubKey.authenticatorSelection.authenticatorAttachment = "cross-platform";
+            }
+
             const cred = await navigator.credentials.create({ publicKey: pubKey });
-            
-            btnElement.innerText = "Verifying encryption... 🔐";
-            
             const bioId = bufferToBase64url(cred.rawId);
-            await fetch(API, postConfig({ action: "register_bio", username: tempBioUsername, bioId: bioId }));
             
+            await fetch(API, postConfig({ action: "register_bio", username: tempBioUsername, bioId: bioId }));
             alert("Passkey Security Enabled!");
             skipBiometrics(); 
         } catch(e) {
             console.error("Passkey Enrollment Error:", e);
-            btnElement.innerText = "Yes, Setup Passkey";
-            btnElement.disabled = false;
-            skipBtn.style.display = "inline-block";
+            document.getElementById('bio-setup-modal').style.display = 'flex';
             alert("Passkey setup failed or was canceled.");
         }
     }
@@ -990,39 +1007,48 @@
         startPhantomKiller();
     }
 
-    async function loginBiometric() {
+    // ELITE QR / CROSS-PLATFORM BIOMETRIC LOGIN
+    async function loginBiometric(attachmentType = undefined) {
         if (!window.PublicKeyCredential) {
             alert("Security Error: Passkeys are not supported on this browser/device.");
             return;
         }
+
+        const bioBtn = attachmentType === 'cross-platform' ? 'bio-qr-btn' : 'bio-btn';
+        const origText = attachmentType === 'cross-platform' ? '📱 QR Passkey' : '🧬 Local Passkey';
 
         try {
             const pubKey = { 
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
-                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
+
+            if (attachmentType === 'cross-platform') {
+                pubKey.authenticatorSelection = { authenticatorAttachment: "cross-platform" };
+            }
+
+            setUIState(bioBtn, true, "Waiting...");
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
             
-            setUIState('bio-btn', true, "Authenticating...");
+            setUIState(bioBtn, true, "Authenticating...");
             
             const devInfo = await getDeviceInfo();
             const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId, deviceInfo: devInfo }));
             const text = await res.text();
             
             if (text === "403_PASSKEY_LOGIN") {
-                setUIState('bio-btn', false, "🧬 Passkey Login"); 
+                setUIState(bioBtn, false, origText); 
                 document.getElementById('login-status').innerText = "Global Passkey Offline.";
-                alert("SECURITY ALERT:\n\nPasskey login is currently disabled globally by the Administrator. Please use your standard password.");
+                alert("SECURITY ALERT:\n\nPasskey login is currently disabled globally by the Administrator.");
             } else if (text === "403_BIO") {
-                setUIState('bio-btn', false, "🧬 Passkey Login"); 
+                setUIState(bioBtn, false, origText); 
                 document.getElementById('login-status').innerText = "Passkey Disabled.";
-                alert("SECURITY ALERT:\n\nPasskey login has been disabled for your account by the Administrator. Please use your standard password.");
+                alert("SECURITY ALERT:\n\nPasskey login has been disabled for your account.");
             } else if (text === "401" || text === "401_PASS" || text.startsWith("ERROR:")) { 
-                setUIState('bio-btn', false, "🧬 Passkey Login"); document.getElementById('login-status').innerText = "Passkey Verification Failed."; 
+                setUIState(bioBtn, false, origText); document.getElementById('login-status').innerText = "Passkey Verification Failed."; 
             } else if (text === "503") {
                 document.getElementById('login-container').style.display = "none";
                 document.getElementById('massive-maint-block').style.display = "block";
@@ -1033,7 +1059,7 @@
                 document.getElementById('force-pass-status').innerText = "";
                 document.getElementById('force-pass-btn').disabled = true;
                 document.getElementById('force-pass-modal').style.display = 'flex';
-                setUIState('bio-btn', false, "🧬 Passkey Login");
+                setUIState(bioBtn, false, origText);
             } else if (text.includes("200")) {
                 const data = JSON.parse(text);
                 sessionStorage.setItem('mgc_secure', sysCrypt.lock(data.user));
@@ -1041,10 +1067,10 @@
                 sessionStorage.setItem('mgc_links_sec', sysCrypt.lock(data.links || []));
                 initVault(data.user, data.links || []);
                 startPhantomKiller();
-            } else { setUIState('bio-btn', false, "🧬 Passkey Login"); }
+            } else { setUIState(bioBtn, false, origText); }
         } catch(e) {
             console.error("Passkey Login Error:", e);
-            setUIState('bio-btn', false, "🧬 Passkey Login");
+            setUIState(bioBtn, false, origText);
             document.getElementById('login-status').innerText = "Passkey canceled or unavailable.";
         }
     }
@@ -1206,11 +1232,11 @@
         document.getElementById('db-auth-modal').style.display = 'flex';
         document.getElementById('db-auth-input').value = "";
         
-        const dbBioBtn = document.getElementById('db-bio-btn');
+        const dbBioContainer = document.getElementById('db-bio-container');
         if (session.hasBio && session.bioStatus !== "Disabled") {
-            dbBioBtn.style.display = "inline-block";
+            dbBioContainer.style.display = "flex";
         } else {
-            dbBioBtn.style.display = "none";
+            dbBioContainer.style.display = "none";
         }
 
         setUIState('decrypt-btn', false, "Verify");
@@ -1241,7 +1267,7 @@
                 document.getElementById('db-auth-title').innerText = "Setup DB Auth Code";
                 document.getElementById('decrypt-status').innerHTML = "<span style='color:var(--gold);'>Auth code not set. Enter a new code to request approval.</span>";
                 document.getElementById('decrypt-btn').setAttribute('onclick', "submitResetRequest('AuthCode')");
-                document.getElementById('db-bio-btn').style.display = 'none';
+                document.getElementById('db-bio-container').style.display = 'none';
                 return;
             }
 
@@ -1268,7 +1294,8 @@
         } catch(e) { clearInterval(loadingInterval); setUIState('decrypt-btn', false, "Verify", true); document.getElementById('decrypt-status').innerText = "Database Offline."; }
     }
 
-    async function verifyDBAuthBiometric() {
+    // ELITE QR / CROSS-PLATFORM DB AUTH
+    async function verifyDBAuthBiometric(attachmentType = undefined) {
         if (!window.PublicKeyCredential) {
             alert("Security Error: Passkeys are not supported on this browser/device.");
             return;
@@ -1276,29 +1303,29 @@
 
         const encSession = sessionStorage.getItem('mgc_secure');
         const session = sysCrypt.unlock(encSession);
-        const dbBioBtn = document.getElementById('db-bio-btn');
         
-        dbBioBtn.disabled = true;
-        dbBioBtn.innerText = "Authenticating...";
-
         try {
             const pubKey = { 
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
-                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
+
+            if (attachmentType === 'cross-platform') {
+                pubKey.authenticatorSelection = { authenticatorAttachment: "cross-platform" };
+            }
+
+            document.getElementById('decrypt-status').innerText = "Waiting for Passkey...";
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
 
+            document.getElementById('decrypt-status').innerText = "Authenticating Database...";
             const devInfo = await getDeviceInfo();
             const res = await fetch(API, postConfig({ action: "verify_auth_bio", username: session.username, bioId: bioId, deviceInfo: devInfo }));
             const text = await res.text();
 
             if (text === "FORCE_AUTH") {
-                dbBioBtn.disabled = false;
-                dbBioBtn.innerText = "🧬 Passkey Auth";
                 closeModals();
                 document.getElementById('force-a').value = "";
                 document.getElementById('force-auth-status').innerText = "";
@@ -1307,8 +1334,7 @@
             }
 
             if (text === "200") {
-                dbBioBtn.disabled = false;
-                dbBioBtn.innerText = "🧬 Passkey Auth";
+                document.getElementById('decrypt-status').innerText = "";
                 sessionStorage.setItem('mgc_view', 'db'); 
                 closeModals(); 
                 document.getElementById('db-modal').style.display = 'flex';
@@ -1317,20 +1343,14 @@
                 refreshDB(); 
                 liveRadarTimer = setInterval(refreshDB, 5000);
             } else if (text === "403") {
-                dbBioBtn.disabled = false;
-                dbBioBtn.innerText = "🧬 Passkey Auth";
                 document.getElementById('decrypt-status').innerText = "Passkey Verification Failed.";
                 document.getElementById('decrypt-status').className = "status-msg error-msg";
             } else {
-                dbBioBtn.disabled = false;
-                dbBioBtn.innerText = "🧬 Passkey Auth";
                 document.getElementById('decrypt-status').innerText = "Passkey Not Found.";
                 document.getElementById('decrypt-status').className = "status-msg error-msg";
             }
         } catch(e) {
             console.error("Passkey DB Auth Error:", e);
-            dbBioBtn.disabled = false;
-            dbBioBtn.innerText = "🧬 Passkey Auth";
             document.getElementById('decrypt-status').innerText = "Passkey canceled or unavailable.";
             document.getElementById('decrypt-status').className = "status-msg error-msg";
         }
