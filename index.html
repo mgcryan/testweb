@@ -947,8 +947,7 @@
                 rp: { name: "mgcryan Secure", id: document.location.hostname },
                 user: { id: Uint8Array.from(tempBioUsername, c => c.charCodeAt(0)), name: tempBioUsername, displayName: tempBioUsername },
                 pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                authenticatorSelection: { userVerification: "preferred", residentKey: "preferred", requireResidentKey: false },
-                hints: ["hybrid", "client-device"],
+                authenticatorSelection: { userVerification: "preferred", residentKey: "required", requireResidentKey: true },
                 timeout: 60000
             };
             const cred = await navigator.credentials.create({ publicKey: pubKey });
@@ -988,7 +987,6 @@
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
-                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
@@ -1273,7 +1271,6 @@
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
-                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
