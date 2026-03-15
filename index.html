@@ -542,7 +542,7 @@
         return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
     }
 
-    // ELITE DEVICE INFO ENGINE W/ ABORT TIMEOUT
+    // ELITE DEVICE INFO ENGINE W/ ABORT TIMEOUT & CLIENT HINTS
     async function getDeviceInfo() {
         let ip = "Unknown IP";
         try { 
@@ -554,36 +554,68 @@
             ip = data.ip; 
         } catch(e) { console.warn("IP tracking skipped."); }
         
-        const ua = navigator.userAgent;
         let os = "Unknown", osVersion = "", deviceType = "Desktop", model = "Standard Build", browser = "Unknown";
-        let architecture = "Unknown", bitness = "Unknown", hardware = [];
+        let architecture = "Unknown", hardware = [];
 
-        if (/windows phone/i.test(ua)) { os = "Windows Phone"; deviceType = "Mobile"; }
-        else if (/windows/i.test(ua)) { os = "Windows"; const match = ua.match(/Windows NT ([\d.]+)/); if(match) osVersion = match[1]; }
-        else if (/android/i.test(ua)) { os = "Android"; const match = ua.match(/Android ([\d.]+)/); if(match) osVersion = match[1]; deviceType = "Mobile"; }
-        else if (/ipad|iphone|ipod/i.test(ua)) { os = "iOS"; const match = ua.match(/OS (\d+)_(\d+)/); if(match) osVersion = `${match[1]}.${match[2]}`; deviceType = /ipad/i.test(ua) ? "Tablet" : "Mobile"; }
-        else if (/mac os/i.test(ua)) { os = "macOS"; }
-        else if (/linux/i.test(ua)) { os = "Linux"; }
-
-        if (os === "Android") {
-            const match = ua.match(/\bAndroid[^\;]+\; ([^\;\)]+) Build/i);
-            if (match) model = match[1].trim();
-        } else if (os === "iOS") {
-            if (/iphone/i.test(ua)) model = "iPhone";
-            else if (/ipad/i.test(ua)) model = "iPad";
+        // 1. Modern Client Hints API (Bypasses frozen Android 10 & missing model data)
+        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            try {
+                const hints = await navigator.userAgentData.getHighEntropyValues([
+                    "architecture", "bitness", "model", "platform", "platformVersion"
+                ]);
+                
+                os = hints.platform || "Unknown";
+                if (os === "Android") {
+                    deviceType = "Mobile";
+                    osVersion = hints.platformVersion;
+                } else if (os === "Windows") {
+                    const major = parseInt(hints.platformVersion.split('.')[0]);
+                    if (major >= 13) osVersion = "11";
+                    else if (major > 0) osVersion = "10";
+                } else {
+                    osVersion = hints.platformVersion;
+                }
+                
+                model = hints.model || model;
+                if(hints.architecture) {
+                    architecture = hints.architecture;
+                    if(hints.bitness) architecture += ` (${hints.bitness}-bit)`;
+                }
+            } catch(e) {}
         }
 
+        // 2. Fallback Legacy User-Agent Parsing (If Client Hints fails or is Apple)
+        const ua = navigator.userAgent;
+        if (os === "Unknown") {
+            if (/windows phone/i.test(ua)) { os = "Windows Phone"; deviceType = "Mobile"; }
+            else if (/windows/i.test(ua)) { os = "Windows"; const match = ua.match(/Windows NT ([\d.]+)/); if(match) osVersion = match[1]; }
+            else if (/android/i.test(ua)) { os = "Android"; const match = ua.match(/Android ([\d.]+)/); if(match) osVersion = match[1]; deviceType = "Mobile"; }
+            else if (/ipad|iphone|ipod/i.test(ua)) { os = "iOS"; const match = ua.match(/OS (\d+)_(\d+)/); if(match) osVersion = `${match[1]}.${match[2]}`; deviceType = /ipad/i.test(ua) ? "Tablet" : "Mobile"; }
+            else if (/mac os/i.test(ua)) { os = "macOS"; }
+            else if (/linux/i.test(ua)) { os = "Linux"; }
+            
+            if (os === "Android" && model === "Standard Build") {
+                const match = ua.match(/\bAndroid[^\;]+\; ([^\;\)]+) Build/i);
+                if (match) model = match[1].trim();
+            } else if (os === "iOS") {
+                if (/iphone/i.test(ua)) model = "iPhone";
+                else if (/ipad/i.test(ua)) model = "iPad";
+            }
+            
+            if (/aarch64|arm64|armv8/i.test(ua)) architecture = "ARM64";
+            else if (/arm/i.test(ua)) architecture = "ARM";
+            else if (/x86_64|win64|wow64|x64/i.test(ua)) architecture = "x64";
+            else if (/i386|i686|win32|x86/i.test(ua)) architecture = "x86";
+        }
+
+        // Browser Detection
         if (/edg/i.test(ua)) browser = "Edge";
         else if (/opr|opera/i.test(ua)) browser = "Opera";
         else if (/chrome|crios/i.test(ua)) browser = "Chrome";
         else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
         else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = "Safari";
 
-        if (/aarch64|arm64|armv8/i.test(ua)) architecture = "ARM64";
-        else if (/arm/i.test(ua)) architecture = "ARM";
-        else if (/x86_64|win64|wow64|x64/i.test(ua)) architecture = "x64";
-        else if (/i386|i686|win32|x86/i.test(ua)) architecture = "x86";
-
+        // Deep Hardware Telemetry (GPU/CPU)
         try {
             const canvas = document.createElement('canvas');
             const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -591,13 +623,18 @@
                 const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
                 if (debugInfo) {
                     const gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-                    hardware.push(gpu);
+                    if(gpu && gpu !== "Unknown") hardware.push(gpu.replace(/ANGLE \(/ig, '').replace(/\)/g, ''));
                 }
             }
         } catch(e) {}
 
-        if (navigator.hardwareConcurrency) hardware.push(`${navigator.hardwareConcurrency}-Core`);
-        if (navigator.deviceMemory) hardware.push(`${navigator.deviceMemory}GB RAM`);
+        if (navigator.hardwareConcurrency) hardware.push(`${navigator.hardwareConcurrency}-Core CPU`);
+        
+        // RAM (Browser capped at 8GB for anti-fingerprinting)
+        if (navigator.deviceMemory) {
+            let ram = navigator.deviceMemory;
+            hardware.push(`${ram}${ram >= 8 ? 'GB+ (Browser Cap)' : 'GB'} RAM`);
+        }
 
         return {
             ip: ip,
