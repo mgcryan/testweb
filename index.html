@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mgcryan v0.0.0.1</title>
+    <title>mgcryan test1</title>
     <link rel="icon" type="image/png" href="Logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -68,7 +68,7 @@
         .btn-maint-on { background: rgba(255,42,85,0.1); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 15px rgba(255,42,85,0.2); }
 
         .table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
-        .data-table { width: 100%; min-width: 650px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
+        .data-table { width: 100%; min-width: 950px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
         .data-table th { background: rgba(5,10,20,0.95); padding: 12px 10px; color: #888; position: sticky; top: 0; z-index: 2; font-weight: normal; font-size: 10px; text-transform: uppercase;}
         .data-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #ccc; vertical-align: middle; }
 
@@ -101,7 +101,7 @@
     <div class="glass-panel" id="ui-frame">
         <div id="login-container">
             <img src="Logo.png" class="logo" alt="Logo">
-            <h2 id="greet">Welcome to mgcryan v0.0.0.1</h2>
+            <h2 id="greet">Welcome to mgcryan test1</h2>
             
             <div id="auth-zone">
                 <div class="input-group">
@@ -362,12 +362,16 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th style="width: 100px;">Date</th>
-                            <th style="width: 90px;">Time</th>
-                            <th style="width: 90px;">ID</th>
-                            <th style="width: 120px;">Operator</th>
-                            <th style="width: 120px;">Target</th>
-                            <th>Action Details</th>
+                            <th style="width: 70px;">Date</th>
+                            <th style="width: 60px;">Time</th>
+                            <th style="width: 70px;">ID</th>
+                            <th style="width: 90px;">Operator</th>
+                            <th style="width: 90px;">Target</th>
+                            <th style="width: 140px;">Action Details</th>
+                            <th style="width: 90px;">IP Address</th>
+                            <th style="width: 90px;">OS & Arch</th>
+                            <th style="width: 90px;">Device & Model</th>
+                            <th style="width: 90px;">Browser</th>
                         </tr>
                     </thead>
                     <tbody id="audit-logs"></tbody>
@@ -508,6 +512,72 @@
         let str = '';
         for (const char of bytes) str += String.fromCharCode(char);
         return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    }
+
+    async function getDeviceInfo() {
+        let ip = "Unknown IP";
+        try { 
+            const res = await fetch('https://api.ipify.org?format=json'); 
+            const data = await res.json(); 
+            ip = data.ip; 
+        } catch(e) {}
+        
+        let os = "Unknown";
+        let osVersion = "";
+        let deviceType = "Desktop";
+        let model = "";
+        let browser = "Unknown";
+        let architecture = "Unknown";
+        const ua = navigator.userAgent;
+
+        // Base Parsing Fallbacks
+        if (ua.includes("Win")) { os = "Windows"; architecture = (ua.includes("WOW64") || ua.includes("Win64") || ua.includes("x64")) ? "x64" : "x86"; }
+        else if (ua.includes("Mac")) { os = "MacOS"; architecture = ua.includes("Intel") ? "x64" : "ARM"; }
+        else if (ua.includes("Linux")) { os = "Linux"; }
+        
+        if (ua.includes("Android")) { os = "Android"; deviceType = "Mobile"; }
+        if (ua.includes("like Mac OS X")) { os = "iOS"; deviceType = ua.includes("iPad") ? "Tablet" : "Mobile"; }
+
+        if (/Mobi|Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) deviceType = "Mobile";
+        if (/Tablet|iPad/i.test(ua) || (ua.includes("Android") && !ua.includes("Mobile"))) deviceType = "Tablet";
+
+        if (ua.includes("Edg/")) browser = "Edge";
+        else if (ua.includes("Chrome/")) browser = "Chrome";
+        else if (ua.includes("Firefox/")) browser = "Firefox";
+        else if (ua.includes("Safari/") && !ua.includes("Chrome/")) browser = "Safari";
+
+        // Regex Model Extraction (Fallback)
+        if (os === "Android") {
+            const match = ua.match(/Android \d+[^\)]*; ([^\)]+)\)/);
+            if (match && match[1]) model = match[1];
+        } else if (os === "iOS") {
+            if (ua.includes("iPhone")) model = "iPhone";
+            else if (ua.includes("iPad")) model = "iPad";
+        }
+
+        // Elite Hardware Queries (Client Hints API)
+        if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            try {
+                const hints = await navigator.userAgentData.getHighEntropyValues(["architecture", "model", "platform", "platformVersion"]);
+                if (hints.platform) os = hints.platform;
+                if (hints.platformVersion) osVersion = hints.platformVersion;
+                if (hints.architecture) {
+                    architecture = hints.architecture;
+                    if (navigator.userAgentData.bitness) architecture += navigator.userAgentData.bitness;
+                }
+                if (hints.model) model = hints.model;
+            } catch(e) {}
+        }
+
+        return {
+            ip: ip,
+            os: os + (osVersion ? ` ${osVersion}` : ""),
+            device: deviceType,
+            model: model || "Standard Build",
+            browser: browser,
+            architecture: architecture,
+            agent: ua.substring(0, 50)
+        };
     }
 
     function checkPwdStrength(inputId, btnId, msgId, isEdit = false) {
@@ -724,7 +794,8 @@
         }, 1200);
         
         try {
-            const res = await fetch(API, postConfig({action: "login", username: u, password: p}));
+            const devInfo = await getDeviceInfo();
+            const res = await fetch(API, postConfig({action: "login", username: u, password: p, deviceInfo: devInfo}));
             const text = await res.text();
             clearInterval(loadingInterval); 
             
@@ -845,6 +916,11 @@
     }
 
     async function enrollBiometrics(btnElement) {
+        if (!window.PublicKeyCredential) {
+            alert("Security Error: Passkeys are not supported on this browser/device.");
+            return;
+        }
+        
         const skipBtn = btnElement.nextElementSibling;
         btnElement.innerText = "Summoning cyber hamsters... 🐹";
         btnElement.disabled = true;
@@ -856,7 +932,7 @@
                 rp: { name: "mgcryan Secure", id: document.location.hostname },
                 user: { id: Uint8Array.from(tempBioUsername, c => c.charCodeAt(0)), name: tempBioUsername, displayName: tempBioUsername },
                 pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
-                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "required", requireResidentKey: true },
+                authenticatorSelection: { userVerification: "preferred", residentKey: "preferred", requireResidentKey: false },
                 timeout: 60000
             };
             const cred = await navigator.credentials.create({ publicKey: pubKey });
@@ -869,7 +945,7 @@
             alert("Passkey Security Enabled!");
             skipBiometrics(); 
         } catch(e) {
-            console.log(e);
+            console.error("Passkey Enrollment Error:", e);
             btnElement.innerText = "Yes, Setup Passkey";
             btnElement.disabled = false;
             skipBtn.style.display = "inline-block";
@@ -886,14 +962,25 @@
     }
 
     async function loginBiometric() {
+        if (!window.PublicKeyCredential) {
+            alert("Security Error: Passkeys are not supported on this browser/device.");
+            return;
+        }
+
         try {
-            const pubKey = { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: document.location.hostname, userVerification: "required" };
+            const pubKey = { 
+                challenge: crypto.getRandomValues(new Uint8Array(32)), 
+                rpId: document.location.hostname, 
+                userVerification: "preferred",
+                timeout: 60000
+            };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
             
             setUIState('bio-btn', true, "Authenticating...");
             
-            const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId }));
+            const devInfo = await getDeviceInfo();
+            const res = await fetch(API, postConfig({ action: "login_bio", bioId: bioId, deviceInfo: devInfo }));
             const text = await res.text();
             
             if (text === "403_PASSKEY_LOGIN") {
@@ -926,7 +1013,7 @@
                 startPhantomKiller();
             } else { setUIState('bio-btn', false, "🧬 Passkey Login"); }
         } catch(e) {
-            console.log(e);
+            console.error("Passkey Login Error:", e);
             setUIState('bio-btn', false, "🧬 Passkey Login");
             document.getElementById('login-status').innerText = "Passkey canceled or unavailable.";
         }
@@ -1112,7 +1199,8 @@
         loadingInterval = setInterval(() => { phraseIndex = (phraseIndex + 1) % dbPhrases.length; setUIState('decrypt-btn', true, dbPhrases[phraseIndex]); }, 1200);
 
         try {
-            const res = await fetch(API, postConfig({action: "verify_auth", username: session.username, authCode: inputAuth}));
+            const devInfo = await getDeviceInfo();
+            const res = await fetch(API, postConfig({action: "verify_auth", username: session.username, authCode: inputAuth, deviceInfo: devInfo}));
             const text = await res.text();
             clearInterval(loadingInterval);
             
@@ -1151,6 +1239,11 @@
     }
 
     async function verifyDBAuthBiometric() {
+        if (!window.PublicKeyCredential) {
+            alert("Security Error: Passkeys are not supported on this browser/device.");
+            return;
+        }
+
         const encSession = sessionStorage.getItem('mgc_secure');
         const session = sysCrypt.unlock(encSession);
         const dbBioBtn = document.getElementById('db-bio-btn');
@@ -1159,11 +1252,17 @@
         dbBioBtn.innerText = "Authenticating...";
 
         try {
-            const pubKey = { challenge: crypto.getRandomValues(new Uint8Array(32)), rpId: document.location.hostname, userVerification: "required" };
+            const pubKey = { 
+                challenge: crypto.getRandomValues(new Uint8Array(32)), 
+                rpId: document.location.hostname, 
+                userVerification: "preferred",
+                timeout: 60000
+            };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
             const bioId = bufferToBase64url(assertion.rawId);
 
-            const res = await fetch(API, postConfig({ action: "verify_auth_bio", username: session.username, bioId: bioId }));
+            const devInfo = await getDeviceInfo();
+            const res = await fetch(API, postConfig({ action: "verify_auth_bio", username: session.username, bioId: bioId, deviceInfo: devInfo }));
             const text = await res.text();
 
             if (text === "FORCE_AUTH") {
@@ -1198,6 +1297,7 @@
                 document.getElementById('decrypt-status').className = "status-msg error-msg";
             }
         } catch(e) {
+            console.error("Passkey DB Auth Error:", e);
             dbBioBtn.disabled = false;
             dbBioBtn.innerText = "🧬 Passkey Auth";
             document.getElementById('decrypt-status').innerText = "Passkey canceled or unavailable.";
@@ -1407,17 +1507,55 @@
 
     async function setForceReset(type, btnElement) {
         if(!confirm(`Force this user to update their ${type} on next login?`)) return;
-        const targetUser = document.getElementById('edit-u').dataset.original;
-        const session = sysCrypt.unlock(sessionStorage.getItem('mgc_secure'));
-        
+
+        const uInput = document.getElementById('edit-u');
+        if(!uInput || !uInput.dataset.original) {
+            alert("System Error: User context lost.");
+            return;
+        }
+        const targetUser = uInput.dataset.original;
+
+        const encSession = sessionStorage.getItem('mgc_secure');
+        if(!encSession) {
+            alert("Security Error: Session invalid. Please log in again.");
+            return;
+        }
+        const session = sysCrypt.unlock(encSession);
+
         btnElement.innerText = "Flagging...";
         btnElement.disabled = true;
         btnElement.style.opacity = '0.5';
-        
-        await fetch(API, postConfig({ action: "set_force_reset", targetUser: targetUser, resetType: type, operatorId: session.id, operatorName: session.name }));
-        
-        btnElement.innerText = type === 'Password' ? "Pass Reset Pending" : "Auth Reset Pending";
-        refreshDB(); 
+
+        try {
+            const res = await fetch(API, postConfig({
+                action: "set_force_reset",
+                targetUser: targetUser,
+                resetType: type,
+                operatorId: session.id,
+                operatorName: session.name
+            }));
+
+            const text = await res.text();
+
+            if (text === "200") {
+                btnElement.innerText = type === 'Password' ? "Pass Reset Pending" : "Auth Reset Pending";
+                btnElement.style.borderColor = "var(--gold)";
+                btnElement.style.color = "var(--gold)";
+                refreshDB();
+            } else {
+                btnElement.innerText = type === 'Password' ? "Require Password Change" : "Require Auth Change";
+                btnElement.disabled = false;
+                btnElement.style.opacity = '1';
+                alert("Backend Error: " + text);
+            }
+        } catch(e) {
+            console.error("Force Reset Error:", e);
+            btnElement.innerText = "Network Error - Retry";
+            btnElement.disabled = false;
+            btnElement.style.opacity = '1';
+            btnElement.style.borderColor = "var(--red)";
+            btnElement.style.color = "var(--red)";
+        }
     }
 
     function toggleAllUsers(source) { let checkboxes = document.querySelectorAll('.user-select'); for(let i=0, n=checkboxes.length;i<n;i++) checkboxes[i].checked = source.checked; }
@@ -1513,7 +1651,18 @@
         const q = document.getElementById('log-filter').value.toLowerCase();
         document.getElementById('audit-logs').innerHTML = masterData.logs.map(l => {
             const rowStr = l.join(' ').toLowerCase(); if(!rowStr.includes(q)) return '';
-            return `<tr><td style="color:#888; font-family:'JetBrains Mono'; white-space:nowrap;">${l[0]}</td><td style="color:#888; font-family:'JetBrains Mono';">${l[1]}</td><td><span class="badge-id">${l[2]}</span></td><td style="color:#fff;">${l[3]}</td><td style="color:#aaa;">${l[4]}</td><td style="color:var(--blue);">${l[5]}</td></tr>`;
+            return `<tr>
+                <td style="color:#888; font-family:'JetBrains Mono'; white-space:nowrap;">${l[0]}</td>
+                <td style="color:#888; font-family:'JetBrains Mono';">${l[1]}</td>
+                <td><span class="badge-id">${l[2]}</span></td>
+                <td style="color:#fff;">${l[3]}</td>
+                <td style="color:#aaa;">${l[4]}</td>
+                <td style="color:var(--blue);">${l[5]}</td>
+                <td style="color:#888;">${l[6] || '-'}</td>
+                <td style="color:#888;">${l[7] || '-'} ${l[8] && l[8] !== '-' && l[8] !== 'Unknown' ? '<br>(' + l[8] + ')' : ''}</td>
+                <td style="color:#888;">${l[9] || '-'} ${l[10] && l[10] !== '-' && l[10] !== 'Standard Build' ? '<br><span style="font-size:9px; color:#555;">' + l[10] + '</span>' : ''}</td>
+                <td style="color:#888;">${l[11] || '-'}</td>
+            </tr>`;
         }).join('');
     }
 
