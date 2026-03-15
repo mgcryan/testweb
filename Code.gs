@@ -80,12 +80,12 @@ function doPost(e) {
     const userSheet = ss.getSheetByName("Users");
     ensureUserColumns(userSheet);
     
-    const logSheet = setupSheet(ss, "Logs", ["Date", "Time", "Operator_ID", "Operator_Name", "Target", "Action", "IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser"]);
+    const logSheet = setupSheet(ss, "Logs", ["Date", "Time", "Operator_ID", "Operator_Name", "Target", "Action", "IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]);
     
-    // Hot-patch: Upgrades existing Log sheets to 12 columns instantly without data loss
-    if (logSheet.getLastColumn() < 12) {
-         logSheet.getRange(1, 7, 1, 6).setValues([["IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser"]]);
-         logSheet.getRange(1, 1, 1, 12).setFontWeight("bold").setBackground("#d9d9d9");
+    // Hot-patch: Upgrades existing Log sheets to 13 columns instantly without data loss
+    if (logSheet.getLastColumn() < 13) {
+         logSheet.getRange(1, 7, 1, 7).setValues([["IP_Address", "OS", "Architecture", "Device_Type", "Model", "Browser", "CPU"]]);
+         logSheet.getRange(1, 1, 1, 13).setFontWeight("bold").setBackground("#d9d9d9");
     }
 
     const sessionSheet = setupSheet(ss, "Sessions", ["ID", "Username", "Role", "Date", "Time", "Token"]); 
@@ -150,7 +150,6 @@ function doPost(e) {
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][1]).trim() === String(data.targetUser).trim()) {
            let current = String(rows[i][10] || "").trim();
-           // Strict array execution to prevent formatting bugs
            let currentArr = current ? current.split(',').map(x => x.trim()).filter(x => x) : [];
            if (!currentArr.includes(data.resetType)) {
                currentArr.push(data.resetType);
@@ -173,7 +172,6 @@ function doPost(e) {
                userSheet.getRange(i + 1, 6).setValue(sha256(data.newHash));
            }
            
-           // Bulletproof flag removal
            let current = String(rows[i][10] || "").trim();
            current = current.split(',').map(x => x.trim()).filter(x => x && x !== data.type).join(',');
            
@@ -248,8 +246,9 @@ function doPost(e) {
             const devType = devInfo.device || "-";
             const model = devInfo.model || "-";
             const browser = devInfo.browser || "-";
+            const cpu = devInfo.cpu || "-";
 
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management via Passkey", ip, os, arch, devType, model, browser]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management via Passkey", ip, os, arch, devType, model, browser, cpu]);
             return ContentService.createTextOutput("200");
           } else {
             logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Failed Database Auth Attempt (Passkey)"]);
@@ -296,8 +295,9 @@ function doPost(e) {
           const devType = devInfo.device || "-";
           const model = devInfo.model || "-";
           const browser = devInfo.browser || "-";
+          const cpu = devInfo.cpu || "-";
           
-          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Passkey", ip, os, arch, devType, model, browser]);
+          logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App via Passkey", ip, os, arch, devType, model, browser, cpu]);
           
           let allowedPages = [];
           if (pageSheet.getLastRow() > 1) {
@@ -357,8 +357,9 @@ function doPost(e) {
             const devType = devInfo.device || "-";
             const model = devInfo.model || "-";
             const browser = devInfo.browser || "-";
+            const cpu = devInfo.cpu || "-";
             
-            logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App", ip, os, arch, devType, model, browser]);
+            logSheet.appendRow([dateStr, timeStr, userId, matchedUsername, "Web App", "Logged into Web App", ip, os, arch, devType, model, browser, cpu]);
             
             let allowedPages = [];
             if (pageSheet.getLastRow() > 1) {
@@ -407,8 +408,9 @@ function doPost(e) {
             const devType = devInfo.device || "-";
             const model = devInfo.model || "-";
             const browser = devInfo.browser || "-";
+            const cpu = devInfo.cpu || "-";
 
-            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management", ip, os, arch, devType, model, browser]);
+            logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Logged into Database Management", ip, os, arch, devType, model, browser, cpu]);
             return ContentService.createTextOutput("200");
           } else {
             logSheet.appendRow([dateStr, timeStr, rows[i][0], rows[i][1], "Database", "Failed Database Auth Attempt"]);
