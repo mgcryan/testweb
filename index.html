@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mgcryan test1</title>
+    <title>mgcryan</title>
     <link rel="icon" type="image/png" href="Logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -37,7 +37,7 @@
         .pwd-rules { font-size: 9px; font-family: 'JetBrains Mono'; margin-top: 4px; min-height: 12px; text-align: left; }
 
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;}
-        .modal-content { background: var(--glass); border: 1px solid rgba(0,115,230,0.2); padding: 25px; width: 100%; max-width: 1050px; max-height: 90vh; display: flex; flex-direction: column; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9); overflow-y: auto;}
+        .modal-content { background: var(--glass); border: 1px solid rgba(0,115,230,0.2); padding: 25px; width: 100%; max-width: 1200px; max-height: 90vh; display: flex; flex-direction: column; border-radius: 8px; box-shadow: 0 0 50px rgba(0,0,0,0.9); overflow-y: auto;}
         
         .nav-back { color: #aaa; font-size: 12px; cursor: pointer; margin-bottom: 15px; display: inline-block; }
         .nav-back:hover { color: #fff; text-decoration: underline; }
@@ -68,7 +68,7 @@
         .btn-maint-on { background: rgba(255,42,85,0.1); border: 1px solid var(--red); color: var(--red); box-shadow: 0 0 15px rgba(255,42,85,0.2); }
 
         .table-container { flex-grow: 1; overflow-x: auto; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; }
-        .data-table { width: 100%; min-width: 950px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
+        .data-table { width: 100%; min-width: 1150px; border-collapse: collapse; font-size: 11px; text-align: left; table-layout: fixed; font-family: 'JetBrains Mono'; }
         .data-table th { background: rgba(5,10,20,0.95); padding: 12px 10px; color: #888; position: sticky; top: 0; z-index: 2; font-weight: normal; font-size: 10px; text-transform: uppercase;}
         .data-table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.02); color: #ccc; vertical-align: middle; }
 
@@ -101,7 +101,7 @@
     <div class="glass-panel" id="ui-frame">
         <div id="login-container">
             <img src="Logo.png" class="logo" alt="Logo">
-            <h2 id="greet">Welcome to mgcryan test1</h2>
+            <h2 id="greet">Welcome to mgcryan</h2>
             
             <div id="auth-zone">
                 <div class="input-group">
@@ -353,7 +353,7 @@
     </div>
 
     <div class="modal" id="logs-modal">
-        <div class="modal-content" style="max-width: 1000px;">
+        <div class="modal-content" style="max-width: 1150px;">
             <span class="nav-back" onclick="backToDBFromLogs()">← Back to Database</span>
             <h3 style="margin:0 0 15px 0; color:#fff;">System Logs</h3>
             <input type="text" id="log-filter" class="log-search" placeholder="Search logs..." onkeyup="renderLogs()">
@@ -369,9 +369,11 @@
                             <th style="width: 90px;">Target</th>
                             <th style="width: 140px;">Action Details</th>
                             <th style="width: 90px;">IP Address</th>
-                            <th style="width: 90px;">OS & Arch</th>
-                            <th style="width: 90px;">Device & Model</th>
-                            <th style="width: 90px;">Browser</th>
+                            <th style="width: 80px;">OS</th>
+                            <th style="width: 100px;">Device & Model</th>
+                            <th style="width: 100px;">Architecture</th>
+                            <th style="width: 100px;">CPU & RAM</th>
+                            <th style="width: 80px;">Browser</th>
                         </tr>
                     </thead>
                     <tbody id="audit-logs"></tbody>
@@ -525,14 +527,17 @@
         let os = "Unknown";
         let osVersion = "";
         let deviceType = "Desktop";
-        let model = "";
+        let model = "Standard Build";
         let browser = "Unknown";
         let architecture = "Unknown";
+        let bitness = "Unknown";
+        let hardware = [];
+
         const ua = navigator.userAgent;
 
         // Base Parsing Fallbacks
-        if (ua.includes("Win")) { os = "Windows"; architecture = (ua.includes("WOW64") || ua.includes("Win64") || ua.includes("x64")) ? "x64" : "x86"; }
-        else if (ua.includes("Mac")) { os = "MacOS"; architecture = ua.includes("Intel") ? "x64" : "ARM"; }
+        if (ua.includes("Win")) { os = "Windows"; }
+        else if (ua.includes("Mac")) { os = "MacOS"; }
         else if (ua.includes("Linux")) { os = "Linux"; }
         
         if (ua.includes("Android")) { os = "Android"; deviceType = "Mobile"; }
@@ -546,36 +551,46 @@
         else if (ua.includes("Firefox/")) browser = "Firefox";
         else if (ua.includes("Safari/") && !ua.includes("Chrome/")) browser = "Safari";
 
-        // Regex Model Extraction (Fallback)
-        if (os === "Android") {
-            const match = ua.match(/Android \d+[^\)]*; ([^\)]+)\)/);
-            if (match && match[1]) model = match[1];
-        } else if (os === "iOS") {
-            if (ua.includes("iPhone")) model = "iPhone";
-            else if (ua.includes("iPad")) model = "iPad";
-        }
+        // Bit Architecture from UA string (Fallback)
+        if (ua.includes("x64") || ua.includes("Win64") || ua.includes("WOW64")) { architecture = "x86"; bitness = "64-bit"; }
+        else if (ua.includes("Win32") || ua.includes("i686")) { architecture = "x86"; bitness = "32-bit"; }
+        else if (ua.includes("aarch64") || ua.includes("ARM")) { architecture = "ARM"; bitness = "64-bit"; }
+
+        // Hardware details
+        if (navigator.hardwareConcurrency) hardware.push(`${navigator.hardwareConcurrency}-Core CPU`);
+        if (navigator.deviceMemory) hardware.push(`${navigator.deviceMemory}GB+ RAM`);
 
         // Elite Hardware Queries (Client Hints API)
         if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
             try {
-                const hints = await navigator.userAgentData.getHighEntropyValues(["architecture", "model", "platform", "platformVersion"]);
+                const hints = await navigator.userAgentData.getHighEntropyValues(["architecture", "bitness", "model", "platform", "platformVersion"]);
                 if (hints.platform) os = hints.platform;
                 if (hints.platformVersion) osVersion = hints.platformVersion;
-                if (hints.architecture) {
-                    architecture = hints.architecture;
-                    if (navigator.userAgentData.bitness) architecture += navigator.userAgentData.bitness;
-                }
+                if (hints.architecture) architecture = hints.architecture;
+                if (hints.bitness) bitness = hints.bitness + "-bit";
                 if (hints.model) model = hints.model;
             } catch(e) {}
+        }
+
+        // Regex Model fallback for older mobile devices
+        if (model === "Standard Build") {
+            if (os === "Android") {
+                const match = ua.match(/Android \d+[^\)]*; ([^\)]+)\)/);
+                if (match && match[1]) model = match[1];
+            } else if (os === "iOS") {
+                if (ua.includes("iPhone")) model = "iPhone";
+                else if (ua.includes("iPad")) model = "iPad";
+            }
         }
 
         return {
             ip: ip,
             os: os + (osVersion ? ` ${osVersion}` : ""),
             device: deviceType,
-            model: model || "Standard Build",
+            model: model,
             browser: browser,
-            architecture: architecture,
+            cpu: hardware.join(' | ') || "Unknown CPU",
+            architecture: architecture === "Unknown" ? "Unknown Arch" : `${architecture} (${bitness})`,
             agent: ua.substring(0, 50)
         };
     }
@@ -933,6 +948,7 @@
                 user: { id: Uint8Array.from(tempBioUsername, c => c.charCodeAt(0)), name: tempBioUsername, displayName: tempBioUsername },
                 pubKeyCredParams: [{alg: -7, type: "public-key"}, {alg: -257, type: "public-key"}],
                 authenticatorSelection: { userVerification: "preferred", residentKey: "preferred", requireResidentKey: false },
+                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
             const cred = await navigator.credentials.create({ publicKey: pubKey });
@@ -972,6 +988,7 @@
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
+                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
@@ -1256,6 +1273,7 @@
                 challenge: crypto.getRandomValues(new Uint8Array(32)), 
                 rpId: document.location.hostname, 
                 userVerification: "preferred",
+                hints: ["hybrid", "client-device"],
                 timeout: 60000
             };
             const assertion = await navigator.credentials.get({ publicKey: pubKey });
@@ -1659,8 +1677,10 @@
                 <td style="color:#aaa;">${l[4]}</td>
                 <td style="color:var(--blue);">${l[5]}</td>
                 <td style="color:#888;">${l[6] || '-'}</td>
-                <td style="color:#888;">${l[7] || '-'} ${l[8] && l[8] !== '-' && l[8] !== 'Unknown' ? '<br>(' + l[8] + ')' : ''}</td>
+                <td style="color:#888;">${l[7] || '-'}</td>
                 <td style="color:#888;">${l[9] || '-'} ${l[10] && l[10] !== '-' && l[10] !== 'Standard Build' ? '<br><span style="font-size:9px; color:#555;">' + l[10] + '</span>' : ''}</td>
+                <td style="color:#888;">${l[8] || '-'}</td>
+                <td style="color:#888;">${l[12] || '-'}</td>
                 <td style="color:#888;">${l[11] || '-'}</td>
             </tr>`;
         }).join('');
