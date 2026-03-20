@@ -66,11 +66,8 @@
         .print-btn { display: none !important; }
         .page { margin: 0; padding: 0; box-shadow: none; max-width: 100%; background-color: #ffffff !important; border: none !important; }
     }
-</style>
-</head>
-<body>
-        <style>
-    .top-nav-controls {
+
+        .top-nav-controls {
         position: absolute;
         top: 20px;
         right: 20px;
@@ -105,12 +102,14 @@
         .nav-btn { padding: 6px 10px; font-size: 11px; }
     }
 </style>
-
+</head>
+<body>
+        
+<div class="wrapper">
 <div class="top-nav-controls">
     <button class="nav-btn" onclick="window.location.href='../index.html'">🔙 Dashboard</button>
     <button class="nav-btn nav-btn-logout" onclick="sessionStorage.clear(); window.location.href='../index.html'">🚪 Logout</button>
 </div>
-<div class="wrapper">
 
     <button class="print-btn" onclick="window.print()">🖨️ Print Cancellation Form</button>
 
